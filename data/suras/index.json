@@ -1,0 +1,268 @@
+[
+ {
+  "n": 1,
+  "title": "Аль-Фатиха",
+  "ayahs": 7,
+  "words": 29,
+  "file": "suras/1.json"
+ },
+ {
+  "n": 78,
+  "title": "Ан-Наба",
+  "ayahs": 40,
+  "words": 173,
+  "file": "suras/78.json"
+ },
+ {
+  "n": 79,
+  "title": "Ан-Назиат",
+  "ayahs": 46,
+  "words": 179,
+  "file": "suras/79.json"
+ },
+ {
+  "n": 80,
+  "title": "Абаса",
+  "ayahs": 42,
+  "words": 133,
+  "file": "suras/80.json"
+ },
+ {
+  "n": 81,
+  "title": "Ат-Таквир",
+  "ayahs": 29,
+  "words": 104,
+  "file": "suras/81.json"
+ },
+ {
+  "n": 82,
+  "title": "Аль-Инфитар",
+  "ayahs": 19,
+  "words": 80,
+  "file": "suras/82.json"
+ },
+ {
+  "n": 83,
+  "title": "Аль-Мутаффифин",
+  "ayahs": 36,
+  "words": 169,
+  "file": "suras/83.json"
+ },
+ {
+  "n": 84,
+  "title": "Аль-Иншикак",
+  "ayahs": 25,
+  "words": 107,
+  "file": "suras/84.json"
+ },
+ {
+  "n": 85,
+  "title": "Аль-Бурудж",
+  "ayahs": 22,
+  "words": 109,
+  "file": "suras/85.json"
+ },
+ {
+  "n": 86,
+  "title": "Ат-Тарик",
+  "ayahs": 17,
+  "words": 61,
+  "file": "suras/86.json"
+ },
+ {
+  "n": 87,
+  "title": "Аль-Аля",
+  "ayahs": 19,
+  "words": 72,
+  "file": "suras/87.json"
+ },
+ {
+  "n": 88,
+  "title": "Аль-Гашия",
+  "ayahs": 26,
+  "words": 92,
+  "file": "suras/88.json"
+ },
+ {
+  "n": 89,
+  "title": "Аль-Фаджр",
+  "ayahs": 30,
+  "words": 137,
+  "file": "suras/89.json"
+ },
+ {
+  "n": 90,
+  "title": "Аль-Балад",
+  "ayahs": 20,
+  "words": 82,
+  "file": "suras/90.json"
+ },
+ {
+  "n": 91,
+  "title": "Аш-Шамс",
+  "ayahs": 15,
+  "words": 54,
+  "file": "suras/91.json"
+ },
+ {
+  "n": 92,
+  "title": "Аль-Лайл",
+  "ayahs": 21,
+  "words": 71,
+  "file": "suras/92.json"
+ },
+ {
+  "n": 93,
+  "title": "Ад-Духа",
+  "ayahs": 11,
+  "words": 40,
+  "file": "suras/93.json"
+ },
+ {
+  "n": 94,
+  "title": "Аш-Шарх",
+  "ayahs": 8,
+  "words": 27,
+  "file": "suras/94.json"
+ },
+ {
+  "n": 95,
+  "title": "Ат-Тин",
+  "ayahs": 8,
+  "words": 34,
+  "file": "suras/95.json"
+ },
+ {
+  "n": 96,
+  "title": "Аль-Аляк",
+  "ayahs": 19,
+  "words": 72,
+  "file": "suras/96.json"
+ },
+ {
+  "n": 97,
+  "title": "Аль-Кадр",
+  "ayahs": 5,
+  "words": 30,
+  "file": "suras/97.json"
+ },
+ {
+  "n": 98,
+  "title": "Аль-Баййина",
+  "ayahs": 8,
+  "words": 94,
+  "file": "suras/98.json"
+ },
+ {
+  "n": 99,
+  "title": "Аз-Зальзаля",
+  "ayahs": 8,
+  "words": 36,
+  "file": "suras/99.json"
+ },
+ {
+  "n": 100,
+  "title": "Аль-Адийат",
+  "ayahs": 11,
+  "words": 40,
+  "file": "suras/100.json"
+ },
+ {
+  "n": 101,
+  "title": "Аль-Кариа",
+  "ayahs": 11,
+  "words": 36,
+  "file": "suras/101.json"
+ },
+ {
+  "n": 102,
+  "title": "Ат-Такасур",
+  "ayahs": 8,
+  "words": 28,
+  "file": "suras/102.json"
+ },
+ {
+  "n": 103,
+  "title": "Аль-Аср",
+  "ayahs": 3,
+  "words": 14,
+  "file": "suras/103.json"
+ },
+ {
+  "n": 104,
+  "title": "Аль-Хумаза",
+  "ayahs": 9,
+  "words": 33,
+  "file": "suras/104.json"
+ },
+ {
+  "n": 105,
+  "title": "Аль-Филь",
+  "ayahs": 5,
+  "words": 23,
+  "file": "suras/105.json"
+ },
+ {
+  "n": 106,
+  "title": "Курайш",
+  "ayahs": 4,
+  "words": 17,
+  "file": "suras/106.json"
+ },
+ {
+  "n": 107,
+  "title": "Аль-Маун",
+  "ayahs": 7,
+  "words": 25,
+  "file": "suras/107.json"
+ },
+ {
+  "n": 108,
+  "title": "Аль-Каусар",
+  "ayahs": 3,
+  "words": 10,
+  "file": "suras/108.json"
+ },
+ {
+  "n": 109,
+  "title": "Аль-Кафирун",
+  "ayahs": 6,
+  "words": 26,
+  "file": "suras/109.json"
+ },
+ {
+  "n": 110,
+  "title": "Ан-Наср",
+  "ayahs": 3,
+  "words": 19,
+  "file": "suras/110.json"
+ },
+ {
+  "n": 111,
+  "title": "Аль-Масад",
+  "ayahs": 5,
+  "words": 23,
+  "file": "suras/111.json"
+ },
+ {
+  "n": 112,
+  "title": "Аль-Ихлас",
+  "ayahs": 4,
+  "words": 15,
+  "file": "suras/112.json"
+ },
+ {
+  "n": 113,
+  "title": "Аль-Фаляк",
+  "ayahs": 5,
+  "words": 23,
+  "file": "suras/113.json"
+ },
+ {
+  "n": 114,
+  "title": "Ан-Нас",
+  "ayahs": 6,
+  "words": 20,
+  "file": "suras/114.json"
+ }
+]

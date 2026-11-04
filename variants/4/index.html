@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калима: ночное чтение</title>
+<meta name="description" content="Тренажёр слов Корана для начинающих: карточки, тест и повтор прямо в Telegram.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Commissioner:wght@400;500;600&family=Sofia+Sans+Condensed:wght@600;800&display=swap" rel="stylesheet">
+<!-- nurtech-check-disable latin-only-font: Amiri только для арабского текста (lang="ar"), русский набран Commissioner и Sofia Sans Condensed -->
+<style>
+:root{
+  --bg:#0F1415; --raise:#161D1E; --ink:#EDEBE7; --muted:#9AA3A1; --line:#273032; --accent:#D39A68; --accent-ink:#1A1410;
+  --f-head:"Sofia Sans Condensed",sans-serif; --f-text:"Commissioner",sans-serif; --f-ar:"Amiri",serif;
+  --s1:.875rem; --s2:1.0625rem; --s3:1.5rem; --s4:clamp(2.6rem,1.6rem + 4.4vw,4.8rem);
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 var(--s2)/1.55 var(--f-text);min-height:100svh}
+.app{max-width:1120px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:28px}
+.top{display:flex;justify-content:space-between;align-items:center}
+.logo{font:800 var(--s3)/1 var(--f-head);letter-spacing:-.01em}
+.top small{color:var(--muted);font-size:var(--s1)}
+.page{position:relative;padding:36px 20px 28px;border-radius:24px;background:radial-gradient(120% 70% at 50% 0%,#2A2620 0%,var(--raise) 55%);text-align:center}
+.page .ar{direction:rtl;font:400 clamp(1.9rem,1.4rem + 2.4vw,2.8rem)/2 var(--f-ar);color:var(--muted)}
+.page .ar b{font-weight:700;color:var(--accent)}
+.gloss{display:inline-grid;gap:4px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.gloss strong{font:800 var(--s3)/1 var(--f-head)}
+.gloss span{color:var(--muted);font-size:var(--s1)}
+h1{font:800 var(--s4)/.9 var(--f-head);letter-spacing:-.02em;text-wrap:balance}
+.lead{color:var(--muted);margin-top:14px;max-width:40ch}
+.btn{display:flex;align-items:center;justify-content:center;min-height:56px;margin-top:24px;border-radius:16px;background:var(--accent);color:var(--accent-ink);font:600 var(--s2)/1 var(--f-text);text-decoration:none}
+.list{margin-top:20px;border-top:1px solid var(--line)}
+.list a{display:flex;justify-content:space-between;align-items:center;min-height:56px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none}
+.list b{font:600 var(--s3)/1 var(--f-head);color:var(--accent)}
+@media (min-width:900px){.wrap{display:grid;grid-template-columns:1.1fr 1fr;gap:64px;align-items:center}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top"><span class="logo">Калима</span><small>Вечернее чтение</small></header>
+  <div class="wrap">
+    <div class="page">
+      <p class="ar" lang="ar">ٱلْحَمْدُ لِلَّهِ <b>رَبِّ</b> ٱلْعَٰلَمِينَ</p>
+      <div class="gloss"><strong>рабб: Господь</strong><span>Хвала Аллаху, Господу миров. «Аль-Фатиха», 2</span></div>
+    </div>
+    <section>
+      <h1>Откройте мусхаф и узнайте слово сами</h1>
+      <p class="lead">Десять слов за вечер, по порядку сур. Через несколько дней приложение само напомнит те, что ускользают.</p>
+      <a class="btn" href="#">Начать урок</a>
+      <nav class="list" aria-label="Режимы">
+        <a href="#">Повторить забытые<b>7</b></a>
+        <a href="#">Аль-Фатиха<b>18 из 25</b></a>
+        <a href="#">Тест из трёх вариантов<b>10</b></a>
+      </nav>
+    </section>
+  </div>
+</main>
+</body>
+</html>

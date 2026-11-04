@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калима: вкладки</title>
+<meta name="description" content="Тренажёр слов Корана для начинающих: карточки, тест и повтор прямо в Telegram.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Commissioner:wght@400;500;600&family=Sofia+Sans+Condensed:wght@600;800&display=swap" rel="stylesheet">
+<!-- nurtech-check-disable latin-only-font: Amiri только для арабского текста (lang="ar") -->
+<link rel="stylesheet" href="../body.css">
+<style>.tabs{position:sticky;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);background:var(--raise);border-top:1px solid var(--line);margin:0 -16px -48px;padding:8px 8px calc(8px + env(safe-area-inset-bottom))}.tabs a{display:grid;justify-items:center;gap:2px;min-height:52px;align-content:center;color:var(--muted);text-decoration:none;font-size:var(--s1)}.tabs a.on{color:var(--accent)}.tabs svg{width:22px;height:22px}.search{min-height:52px;border-radius:16px;border:1px solid var(--line);background:var(--raise);color:var(--ink);padding:0 16px;font:400 var(--s2) var(--f-text);width:100%}.ar-s{font:700 1.7rem/1 var(--f-ar)}.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.days span{aspect-ratio:1;border-radius:10px;background:var(--raise);display:grid;place-items:center;font-size:var(--s1)}.days .t{background:var(--accent);color:var(--accent-ink)}</style>
+</head>
+<body>
+<main class="app">
+  <header class="top"><span class="logo">Калима</span><small>Вечернее чтение</small></header>
+  <div class="wrap">
+    <div class="page">
+      <p class="ar" lang="ar">ٱلْحَمْدُ لِلَّهِ <b>رَبِّ</b> ٱلْعَٰلَمِينَ</p>
+      <div class="gloss"><strong>рабб: Господь</strong><span>Хвала Аллаху, Господу миров. «Аль-Фатиха», 2</span></div>
+    </div>
+    <section>
+      <h1>Откройте мусхаф и узнайте слово сами</h1>
+      <p class="lead">Десять слов за вечер, по порядку сур. Через несколько дней приложение само напомнит те, что ускользают.</p>
+      <a class="btn" href="#" style="margin-top:24px">Начать урок</a>
+    </section>
+  </div>
+  <h2>Четыре вкладки внизу, как в обычном приложении</h2>
+  <div class="screens">
+    <section class="screen" aria-label="Словарь">
+      <p class="muted">Вкладка «Словарь»</p>
+      <input class="search" type="search" placeholder="Найти слово по-русски или по-арабски" aria-label="Поиск слова">
+      <div class="list"><div><span class="ar-s" lang="ar">رَبّ</span><span>Господь</span><b>знаю</b></div><div><span class="ar-s" lang="ar">يَوْم</span><span>день</span><b>учу</b></div><div><span class="ar-s" lang="ar">قَالَ</span><span>сказать</span><b>новое</b></div></div>
+    </section>
+    <section class="screen" aria-label="Повтор">
+      <p class="muted">Вкладка «Повтор»</p>
+      <h2>7 слов сегодня</h2>
+      <div class="days" aria-label="Повторы на неделю"><span class="t">7</span><span>4</span><span>2</span><span>5</span><span>0</span><span>3</span><span>1</span></div>
+      <p class="muted">Слово, которое вы помните, возвращается всё реже: завтра, через 3 дня, через неделю.</p>
+      <a class="btn" href="#">Повторить</a>
+    </section>
+    <section class="screen" aria-label="Нижнее меню">
+      <p class="muted">Меню всегда под пальцем</p>
+      <nav class="tabs" style="position:static;margin:0;border-radius:20px" aria-label="Разделы">
+        <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>Сегодня</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Суры</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Словарь</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Повтор</a>
+      </nav>
+    </section>
+  </div>
+</main>
+</body>
+</html>

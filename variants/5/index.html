@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калима: тетрадь ученика</title>
+<meta name="description" content="Тренажёр слов Корана для начинающих: карточки, тест и повтор прямо в Telegram.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@500;700&family=Onest:wght@400;500;700;800&display=swap" rel="stylesheet">
+<!-- nurtech-check-disable latin-only-font: Noto Naskh Arabic только для арабского текста (lang="ar"), русский набран Onest -->
+<style>
+:root{
+  --bg:#F4F6F5; --card:#FFFFFF; --ink:#111418; --muted:#5E6670; --line:#E1E5E3; --accent:#0E7A54; --accent-soft:#DDF2E8;
+  --f-text:"Onest",sans-serif; --f-ar:"Noto Naskh Arabic",serif;
+  --s1:.875rem; --s2:1.0625rem; --s3:1.375rem; --s4:clamp(2rem,1.4rem + 2.8vw,3.2rem);
+  --r:22px;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 var(--s2)/1.5 var(--f-text)}
+.app{max-width:1120px;margin:0 auto;padding:16px 16px 40px;display:grid;gap:16px}
+.top{display:flex;justify-content:space-between;align-items:center;padding:4px 0 8px}
+.logo{font:800 var(--s3)/1 var(--f-text);letter-spacing:-.02em}
+.week{display:flex;gap:4px}
+.week i{width:10px;height:22px;border-radius:4px;background:var(--line)}
+.week i.d{background:var(--accent)}
+h1{font:800 var(--s4)/.95 var(--f-text);letter-spacing:-.03em;text-wrap:balance;max-width:14ch;padding-bottom:6px}
+.card{background:var(--card);border-radius:var(--r);padding:20px;display:grid;gap:14px}
+.flip{min-height:300px;align-content:space-between;border:1px solid var(--line)}
+.flip .ar{font:700 clamp(4.5rem,3rem + 7vw,7rem)/1.1 var(--f-ar);text-align:center;direction:rtl}
+.flip .hint{display:flex;justify-content:space-between;color:var(--muted);font-size:var(--s1)}
+.answers{display:grid;gap:8px}
+.answers button{min-height:52px;border-radius:14px;border:1px solid var(--line);background:var(--bg);font:500 var(--s2)/1 var(--f-text);color:var(--ink);text-align:left;padding:0 16px}
+.answers button.ok{background:var(--accent-soft);border-color:var(--accent);color:#0B5E41}
+.btn{display:flex;align-items:center;justify-content:center;min-height:56px;border-radius:16px;background:var(--accent);color:#fff;font:700 var(--s2)/1 var(--f-text);text-decoration:none}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.split a{display:grid;gap:4px;padding:16px;border-radius:18px;background:var(--accent-soft);color:var(--ink);text-decoration:none;font-size:var(--s1)}
+.split a+a{background:var(--card)}
+.split b{font:800 var(--s3)/1 var(--f-text)}
+@media (min-width:900px){.wrap{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start}.side{display:grid;gap:16px}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top"><span class="logo">Калима</span><span class="week" aria-label="Дни занятий на этой неделе"><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i><i></i><i></i></span></header>
+  <div class="wrap">
+    <div class="side">
+      <h1>Какое слово здесь написано?</h1>
+      <div class="card flip">
+        <div class="hint"><span>Аль-Фатиха, аят 2</span><span>3 из 10</span></div>
+        <div class="ar" lang="ar">رَبّ</div>
+        <div class="answers">
+          <button type="button">милостивый</button>
+          <button type="button" class="ok">Господь</button>
+          <button type="button">день</button>
+        </div>
+      </div>
+    </div>
+    <div class="side">
+      <a class="btn" href="#">Продолжить урок</a>
+      <div class="split">
+        <a href="#"><b>7</b>слов пора повторить</a>
+        <a href="#"><b>18 из 25</b>слов «Аль-Фатихи» выучено</a>
+      </div>
+      <div class="card"><b>Слова по сурам</b><span style="color:var(--muted);font-size:var(--s1)">После «Аль-Фатихи» откроется джуз «Амма»: короткие суры, которые читают в намазе.</span></div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

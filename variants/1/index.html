@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калима: подстрочник</title>
+<meta name="description" content="Тренажёр слов Корана для начинающих: карточки, тест и повтор прямо в Telegram.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Onest:wght@400;500;600&family=Spectral:wght@500;700&display=swap" rel="stylesheet">
+<!-- nurtech-check-disable latin-only-font: Amiri только для арабского текста (lang="ar"), русский набран Onest и Spectral -->
+<style>
+:root{
+  --bg:#FBFAF7; --ink:#1B1B1B; --muted:#6B6B6B; --line:#DADAD4; --accent:#1F3A93; --accent-soft:#E6EAF5;
+  --f-head:"Spectral",serif; --f-text:"Onest",sans-serif; --f-ar:"Amiri",serif;
+  --s1:clamp(.8125rem,.8rem + .1vw,.875rem); --s2:1.0625rem; --s3:1.375rem; --s4:clamp(2rem,1.4rem + 3vw,3.25rem);
+  --gap:clamp(20px,4vw,40px); --r:14px;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 var(--s2)/1.5 var(--f-text)}
+.app{max-width:1120px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:var(--gap)}
+.top{display:flex;justify-content:space-between;align-items:baseline}
+.logo{font:700 var(--s3)/1 var(--f-head)}
+.top small{color:var(--muted);font-size:var(--s1)}
+.verse{direction:rtl;display:flex;flex-wrap:wrap;gap:18px 22px;justify-content:flex-start;padding:28px 0 8px;border-top:1px solid var(--ink)}
+.w{display:flex;flex-direction:column;align-items:center;gap:6px}
+.w b{font:700 clamp(2.4rem,1.6rem + 4vw,4.2rem)/1.2 var(--f-ar)}
+.w i{direction:ltr;font:italic 500 var(--s1)/1.2 var(--f-head);color:var(--accent)}
+.w.on b{color:var(--accent)}
+.w.on i{background:var(--accent);color:#fff;padding:2px 8px;border-radius:4px;font-style:normal}
+.ref{color:var(--muted);font-size:var(--s1)}
+h1{font:700 var(--s4)/.95 var(--f-head);letter-spacing:-.02em;text-wrap:balance;max-width:16ch}
+.lead{color:var(--muted);max-width:42ch;margin-top:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 28px;border-radius:var(--r);background:var(--accent);color:#fff;font:600 var(--s2)/1 var(--f-text);border:0;text-decoration:none}
+.cta{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;margin-top:22px}
+.cta span{color:var(--muted);font-size:var(--s1)}
+.modes{display:grid;gap:0;border-top:1px solid var(--line)}
+.mode{display:grid;grid-template-columns:1fr auto;gap:4px 16px;padding:16px 0;border-bottom:1px solid var(--line);text-decoration:none;color:inherit}
+.mode strong{font:600 var(--s2)/1.3 var(--f-text)}
+.mode em{font-style:normal;color:var(--muted);font-size:var(--s1);grid-column:1}
+.mode .n{grid-row:1/3;grid-column:2;align-self:center;font:700 var(--s3)/1 var(--f-head);color:var(--accent)}
+@media (min-width:900px){.grid{display:grid;grid-template-columns:1.3fr 1fr;gap:64px;align-items:end}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top"><span class="logo">Калима</span><small>Урок 3 из 40</small></header>
+
+  <section aria-label="Аят с подстрочным переводом">
+    <div class="verse" lang="ar">
+      <span class="w"><b>ٱلْحَمْدُ</b><i>хвала</i></span>
+      <span class="w"><b>لِلَّهِ</b><i>Аллаху</i></span>
+      <span class="w on"><b>رَبِّ</b><i>Господу</i></span>
+      <span class="w"><b>ٱلْعَٰلَمِينَ</b><i>миров</i></span>
+    </div>
+    <p class="ref">Сура «Аль-Фатиха», аят 2</p>
+  </section>
+
+  <div class="grid">
+    <section>
+      <h1>Читаете аят и понимаете каждое слово</h1>
+      <p class="lead">Сегодня слово «рабб»: Господь, Владыка. Оно стоит в первой же суре, и дальше вы узнаете его на каждой странице.</p>
+      <div class="cta"><a class="btn" href="#">Начать урок</a><span>10 слов, около 5 минут</span></div>
+    </section>
+
+    <nav class="modes" aria-label="Режимы">
+      <a class="mode" href="#"><strong>Повторить забытые</strong><em>Слова, которые пора освежить</em><span class="n">7</span></a>
+      <a class="mode" href="#"><strong>Слова по сурам</strong><em>Аль-Фатиха, затем джуз «Амма»</em><span class="n">18/25</span></a>
+      <a class="mode" href="#"><strong>Тест из трёх вариантов</strong><em>Проверить себя без подсказок</em><span class="n">3</span></a>
+    </nav>
+  </div>
+</main>
+</body>
+</html>

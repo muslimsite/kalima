@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калима: цветные главы</title>
+<meta name="description" content="Тренажёр слов Корана для начинающих: карточки, тест и повтор прямо в Telegram.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geologica:wght@400;500&family=Noto+Naskh+Arabic:wght@700&family=Unbounded:wght@700&display=swap" rel="stylesheet">
+<!-- nurtech-check-disable latin-only-font: Noto Naskh Arabic только для арабского текста (lang="ar"), русский набран Geologica и Unbounded -->
+<style>
+:root{
+  --ink:#141414; --c1:#BFE3D0; --c2:#F6C9C2; --c3:#F4E08A; --c4:#141414; --paper:#FAF8F2;
+  --f-head:"Unbounded",sans-serif; --f-text:"Geologica",sans-serif; --f-ar:"Noto Naskh Arabic",serif;
+  --s1:.875rem; --s2:1.0625rem; --s3:clamp(1.4rem,1.1rem + 1.4vw,2rem); --s4:clamp(2.2rem,1.2rem + 5vw,4.6rem);
+  --pad:clamp(16px,5vw,64px);
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--c1);color:var(--ink);font:400 var(--s2)/1.5 var(--f-text)}
+.f{padding:24px var(--pad) 32px;display:grid;gap:16px}
+.f1{background:var(--c1);min-height:74svh;align-content:space-between}
+.f2{background:var(--c2)}
+.f3{background:var(--c3)}
+.f4{background:var(--c4);color:var(--paper)}
+.top{display:flex;justify-content:space-between;font-size:var(--s1)}
+.top b{font:700 var(--s2)/1 var(--f-head)}
+.ar{font:700 clamp(7rem,3rem + 24vw,14rem)/1 var(--f-ar);direction:rtl;text-align:right}
+h1{font:700 var(--s4)/.92 var(--f-head);letter-spacing:-.035em;text-wrap:balance;max-width:12ch}
+.f1 p{max-width:36ch}
+a.f .big{font:700 var(--s3)/1 var(--f-head);letter-spacing:-.02em}
+a.f{text-decoration:none;color:inherit;grid-template-columns:1fr auto;align-items:end}
+a.f span{font-size:var(--s1);grid-column:1}
+a.f .num{grid-row:1/3;grid-column:2;font:700 clamp(3rem,2rem + 5vw,5.5rem)/.9 var(--f-head);letter-spacing:-.04em}
+.f4{grid-template-columns:1fr;text-align:left}
+.go{display:flex;align-items:center;justify-content:space-between;min-height:64px;padding:0 24px;border-radius:20px;background:var(--paper);color:var(--ink);font:700 var(--s2)/1 var(--f-head);text-decoration:none}
+.go svg{width:24px;height:24px}
+@media (min-width:900px){.f1{grid-template-columns:1fr 1fr;align-items:end}.f1 .top{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<main>
+  <section class="f f1">
+    <div class="top"><b>Калима</b><span>Глава 1. Аль-Фатиха</span></div>
+    <div>
+      <h1>Слово «рабб» значит Господь</h1>
+      <p>Оно во втором аяте первой суры. Выучите его, и вы узнаете его в каждой главе Корана.</p>
+    </div>
+    <div class="ar" lang="ar">رَبّ</div>
+  </section>
+  <a class="f f2" href="#"><span class="big">Повторить</span><span>Слова, которые вы начали забывать</span><span class="num">7</span></a>
+  <a class="f f3" href="#"><span class="big">Аль-Фатиха</span><span>Выучено слов из суры</span><span class="num">18/25</span></a>
+  <section class="f f4">
+    <a class="go" href="#">Начать урок
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    <span>10 слов: карточки, потом тест из трёх вариантов</span>
+  </section>
+</main>
+</body>
+</html>

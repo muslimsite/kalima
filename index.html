@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Калима: слова Корана</title>
+  <meta name="description" content="Калима: тренажёр слов Корана в Telegram для начинающих. Карточки, тест из трёх вариантов, слова по сурам и повтор забытого.">
+  <!-- nurtech-check-disable no-og-image: это мини-приложение Telegram, оно открывается кнопкой бота, а не ссылкой; превью сделаем на шаге публикации, если понадобится -->
+  <meta name="theme-color" content="#0F1415">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Commissioner:wght@400;500;600&family=Sofia+Sans+Condensed:wght@600;800&display=swap" rel="stylesheet">
+  <!-- nurtech-check-disable latin-only-font: Amiri только для арабского текста (lang="ar") -->
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <button class="logo" type="button" data-go="home">Калима</button>
+      <small id="where">Вечернее чтение</small>
+    </header>
+    <div id="view" aria-live="polite">
+      <p class="muted">Загружаем слова…</p>
+    </div>
+  </main>
+  <div id="sheet" hidden></div>
+</body>
+</html>

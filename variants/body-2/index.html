@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калима: мусхаф</title>
+<meta name="description" content="Тренажёр слов Корана для начинающих: карточки, тест и повтор прямо в Telegram.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Commissioner:wght@400;500;600&family=Sofia+Sans+Condensed:wght@600;800&display=swap" rel="stylesheet">
+<!-- nurtech-check-disable latin-only-font: Amiri только для арабского текста (lang="ar") -->
+<link rel="stylesheet" href="../body.css">
+<style>.chips{direction:rtl;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}.chips span{font:400 1.9rem/1.6 var(--f-ar);padding:2px 12px;border-radius:12px;border:1px solid var(--line)}.chips .k{border-color:var(--ok);color:var(--ok)}.chips .n{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}.sheet{background:var(--raise);border-radius:24px 24px 0 0;padding:20px;display:grid;gap:12px;border-top:1px solid var(--line)}.bar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}</style>
+</head>
+<body>
+<main class="app">
+  <header class="top"><span class="logo">Калима</span><small>Вечернее чтение</small></header>
+  <div class="wrap">
+    <div class="page">
+      <p class="ar" lang="ar">ٱلْحَمْدُ لِلَّهِ <b>رَبِّ</b> ٱلْعَٰلَمِينَ</p>
+      <div class="gloss"><strong>рабб: Господь</strong><span>Хвала Аллаху, Господу миров. «Аль-Фатиха», 2</span></div>
+    </div>
+    <section>
+      <h1>Откройте мусхаф и узнайте слово сами</h1>
+      <p class="lead">Десять слов за вечер, по порядку сур. Через несколько дней приложение само напомнит те, что ускользают.</p>
+      <a class="btn" href="#" style="margin-top:24px">Открыть «Аль-Фатиху»</a>
+      <p class="muted" style="margin-top:12px">7 слов ждут повторения</p>
+    </section>
+  </div>
+  <h2>Учите прямо по тексту: сура, аят, слово</h2>
+  <div class="screens">
+    <section class="screen" aria-label="Оглавление сур">
+      <p class="muted">Оглавление</p>
+      <div class="list">
+        <a href="#"><span>1. Аль-Фатиха<br><span class="muted">18 из 25 слов</span></span><b>72%</b></a>
+        <a href="#"><span>114. Ан-Нас<br><span class="muted">откроется следом</span></span><b>0%</b></a>
+        <a href="#"><span>113. Аль-Фаляк<br><span class="muted">откроется следом</span></span><b>0%</b></a>
+      </div>
+    </section>
+    <section class="screen" aria-label="Аят по словам">
+      <p class="muted">Аль-Фатиха, аят 3. Зелёные вы уже знаете</p>
+      <div class="page"><div class="chips" lang="ar"><span class="k">ٱلرَّحْمَٰنِ</span><span class="n">ٱلرَّحِيمِ</span></div></div>
+      <div class="bar" aria-label="Прогресс суры"><i style="width:72%"></i></div>
+    </section>
+    <section class="screen" aria-label="Карточка слова снизу">
+      <p class="muted">Касание по слову открывает карточку</p>
+      <div class="sheet">
+        <div class="word" lang="ar" style="text-align:center">رَحِيم</div>
+        <strong style="font:800 var(--s3)/1 var(--f-head);text-align:center">рахим: Милующий</strong>
+        <p class="muted" style="text-align:center">Корень ر ح م, как в «рахма», милость</p>
+        <button class="btn">Учить это слово</button>
+      </div>
+    </section>
+  </div>
+</main>
+</body>
+</html>

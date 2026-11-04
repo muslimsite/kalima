@@ -1,0 +1,38 @@
+/* nurtech-check-disable latin-only-font: Amiri только для арабского текста (lang="ar") */
+/* Общая база второго веера: токены из DESIGN.md (вариант 4, «Ночное чтение») */
+:root{
+  --bg:#0F1415; --raise:#161D1E; --lamp:#2A2620; --ink:#EDEBE7; --muted:#9AA3A1; --line:#273032;
+  --accent:#D39A68; --accent-ink:#1A1410; --ok:#7FB89A; --bad:#D9766B;
+  --f-head:"Sofia Sans Condensed",sans-serif; --f-text:"Commissioner",sans-serif; --f-ar:"Amiri",serif;
+  --s1:.875rem; --s2:1.0625rem; --s3:1.5rem; --s4:clamp(2.6rem,1.6rem + 4.4vw,4.8rem);
+}
+*{box-sizing:border-box;margin:0}
+img,video{max-width:100%;height:auto}
+body{background:var(--bg);color:var(--ink);font:400 var(--s2)/1.55 var(--f-text)}
+.app{max-width:1120px;margin:0 auto;padding:20px 16px 48px;display:grid;gap:28px}
+.top{display:flex;justify-content:space-between;align-items:center}
+.logo{font:800 var(--s3)/1 var(--f-head)}
+.top small,.muted{color:var(--muted);font-size:var(--s1)}
+.page{padding:36px 20px 28px;border-radius:24px;background:radial-gradient(120% 70% at 50% 0%,var(--lamp) 0%,var(--raise) 55%);text-align:center}
+.page .ar{direction:rtl;font:400 clamp(1.9rem,1.4rem + 2.4vw,2.8rem)/2 var(--f-ar);color:var(--muted)}
+.page .ar b{font-weight:700;color:var(--accent)}
+.gloss{display:inline-grid;gap:4px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.gloss strong{font:800 var(--s3)/1 var(--f-head)}
+.gloss span{color:var(--muted);font-size:var(--s1)}
+h1{font:800 var(--s4)/.9 var(--f-head);letter-spacing:-.02em;text-wrap:balance}
+h2{font:800 clamp(1.8rem,1.4rem + 1.6vw,2.6rem)/.95 var(--f-head);letter-spacing:-.015em;text-wrap:balance}
+.lead{color:var(--muted);margin-top:14px;max-width:40ch}
+.btn{display:flex;align-items:center;justify-content:center;min-height:56px;border-radius:16px;background:var(--accent);color:var(--accent-ink);font:600 var(--s2)/1 var(--f-text);text-decoration:none;border:0;width:100%}
+.btn.ghost{background:none;color:var(--ink);border:1px solid var(--line)}
+.list{border-top:1px solid var(--line)}
+.list a,.list div{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:56px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none}
+.list b{font:600 var(--s3)/1 var(--f-head);color:var(--accent)}
+.ans{display:grid;gap:8px}
+.ans button{min-height:56px;border-radius:16px;background:var(--raise);border:1px solid var(--line);color:var(--ink);font:500 var(--s2)/1 var(--f-text);text-align:left;padding:0 18px}
+.ans .ok{border-color:var(--ok);color:var(--ok)}
+.ans .bad{border-color:var(--bad);color:var(--bad)}
+.word{font:700 clamp(4.5rem,3rem + 10vw,7.5rem)/1.1 var(--f-ar);direction:rtl}
+.screen{display:grid;gap:16px;align-content:start}
+.screen>.muted:first-child{padding-bottom:4px;border-bottom:1px solid var(--line)}
+.screens{display:grid;gap:48px}
+@media (min-width:900px){.wrap{display:grid;grid-template-columns:1.1fr 1fr;gap:64px;align-items:center}.screens{grid-template-columns:repeat(3,1fr);gap:32px}}
