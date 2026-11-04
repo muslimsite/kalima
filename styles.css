@@ -84,3 +84,10 @@ p { text-wrap: pretty; }
   .narrow { max-width: 640px; width: 100%; margin: 0 auto; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Приветствие при первом запуске: зелёный по просьбе заказчицы */
+.welcome { min-height: 70svh; display: grid; align-content: center; gap: 20px; text-align: center; justify-items: center; }
+.welcome .ayah { color: var(--ok); font-weight: 700; font-size: clamp(2.4rem, 1.8rem + 3vw, 3.4rem); }
+.welcome h1 { color: var(--ok); }
+.welcome .lead { margin-top: 0; }
+.welcome .btn { max-width: 420px; background: var(--ok); color: #0E1A14; }

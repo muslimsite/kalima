@@ -17,7 +17,7 @@ let COV = null;        // coverage.json
 let order = [];        // id слов в порядке обучения
 let setOf = {};        // id слова → id набора
 let P = {};            // прогресс: id → [коробка, день повтора]
-let S = { set: null, pin: [] }; // выбранный набор, слова «учить следующими»
+let S = { set: null, pin: [], hi: false }; // выбранный набор, слова «учить следующими»
 let screen = 'home';
 let back = null;
 
@@ -121,10 +121,21 @@ function go(name, arg) {
   screen = name;
   closeSheet();
   window.scrollTo(0, 0);
-  ({ home, lesson, toc, sura })[name](arg);
-  if (tg && tg.BackButton) name === 'home' ? tg.BackButton.hide() : tg.BackButton.show();
+  ({ home, lesson, toc, sura, welcome })[name](arg);
+  if (tg && tg.BackButton) name === 'home' || name === 'welcome' ? tg.BackButton.hide() : tg.BackButton.show();
 }
 function goBack() { if (!$sheet.hidden) return closeSheet(); if (back) { const b = back; back = null; return b(); } go('home'); }
+
+/* ---------- приветствие при первом запуске ---------- */
+function welcome() {
+  $where.textContent = '';
+  $view.innerHTML = `<div class="narrow welcome">
+    <p class="ayah" lang="ar">ٱلسَّلَامُ عَلَيْكُمْ</p>
+    <h1>Ассаляму алейкум, сестра!</h1>
+    <p class="lead">Рада видеть тебя в тренажёре. Занимайся, учи слова Корана и получай свою награду.</p>
+    <button class="btn" data-act="hello">Начать</button>
+  </div>`;
+}
 
 /* ---------- главная ---------- */
 function home() {
@@ -318,6 +329,7 @@ document.addEventListener('click', (e) => {
   if (t.dataset.go) return go(t.dataset.go, { n: t.dataset.n, set: t.dataset.set });
   const a = t.dataset.act;
   if (a === 'close') { if (e.target === t || t.tagName === 'BUTTON') closeSheet(); return; }
+  if (a === 'hello') { S.hi = true; save(); haptic('ok'); return go('home'); }
   if (a === 'learn') return go('lesson', 'learn');
   if (a === 'review') return go('lesson', 'review');
   if (a === 'flip') { L.flipped = !L.flipped; haptic(); return drawCard(); }
@@ -346,10 +358,10 @@ document.addEventListener('click', (e) => {
   }
   D.sets.forEach((s) => s.words.forEach((id) => { if (!setOf[id] && D.words[id]) { setOf[id] = s.id; order.push(id); } }));
   S.set = D.sets[0].id;
-  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [] }; };
+  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi }; };
   const local = loadLocal();
   apply(local);
-  go('home');
+  go(S.hi ? 'home' : 'welcome');
   const remote = await loadCloud();
-  if (remote && (!local || remote.t > local.t)) { apply(remote); if (screen === 'home') go('home'); }
+  if (remote && (!local || remote.t > local.t)) { apply(remote); if (screen === 'home' || (screen === 'welcome' && S.hi)) go('home'); }
 })();
