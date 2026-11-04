@@ -13,11 +13,12 @@ const INTERVALS = [0, 1, 3, 7, 14, 30, 90]; // дни до повтора для
 const today = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000);
 
 let D = null;          // words.json
-let COV = null;        // coverage.json
+let COV = null;
+let SIDX = [];       // suras/index.json        // coverage.json
 let order = [];        // id слов в порядке обучения
 let setOf = {};        // id слова → id набора
 let P = {};            // прогресс: id → [коробка, день повтора]
-let S = { set: null, pin: [], hi: false }; // выбранный набор, слова «учить следующими»
+let S = { set: null, pin: [], hi: false, h: {}, rep: 3, qari: 'Husary_Muallim_128kbps' }; // выбранный набор, слова «учить следующими»
 let screen = 'home';
 let back = null;
 
@@ -43,19 +44,29 @@ function ref(ex) { return `«${suraTitle(ex.sura)}», ${ex.ayah}`; }
 const pad3 = (n) => String(n).padStart(3, '0');
 const wordUrl = (path) => 'https://audio.qurancdn.com/' + path;
 const locUrl = (s, a, w) => wordUrl(`wbw/${pad3(s)}_${pad3(a)}_${pad3(w)}.mp3`);
-const ayahUrl = (s, a) => `https://everyayah.com/data/Alafasy_128kbps/${pad3(s)}${pad3(a)}.mp3`;
+const ayahUrl = (s, a, q = 'Alafasy_128kbps') => `https://everyayah.com/data/${q}/${pad3(s)}${pad3(a)}.mp3`;
+// Чтецы для хифза: учебные чтения с паузами для повторения идут первыми.
+const QARI = [
+  ['Husary_Muallim_128kbps', 'Хусари, учебное'],
+  ['Minshawy_Teacher_128kbps', 'Миншави, учебное'],
+  ['Husary_128kbps', 'Хусари'],
+  ['Alafasy_128kbps', 'Аль-Афаси'],
+];
 const player = new Audio();
 player.preload = 'none';
 let playingBtn = null;
-function play(url, btn) {
+let queue = [];
+function play(src, btn) {
+  const list = Array.isArray(src) ? src : [src];
   if (playingBtn) playingBtn.classList.remove('on');
-  if (playingBtn === btn && !player.paused) { player.pause(); playingBtn = null; return; }
-  player.src = url;
+  if (btn && playingBtn === btn && !player.paused) { player.pause(); queue = []; playingBtn = null; return; }
+  queue = list.slice(1);
+  player.src = list[0];
   playingBtn = btn || null;
   if (btn) btn.classList.add('on');
   player.play().catch(() => { if (btn) { btn.classList.remove('on'); btn.classList.add('err'); } });
 }
-player.addEventListener('ended', () => { if (playingBtn) playingBtn.classList.remove('on'); playingBtn = null; });
+player.addEventListener('ended', () => { if (queue.length) { player.src = queue.shift(); player.play().catch(() => {}); return; } if (playingBtn) playingBtn.classList.remove('on'); playingBtn = null; });
 const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.4 18.4a9 9 0 0 0 0-12.8"/></svg>';
 function sounds(w) {
   const ex = w.example;
@@ -143,9 +154,10 @@ function whenLabel(id) {
 /* ---------- навигация ---------- */
 function go(name, arg) {
   screen = name;
+  back = null;
   closeSheet();
   window.scrollTo(0, 0);
-  ({ home, lesson, toc, sura, welcome })[name](arg);
+  ({ home, lesson, toc, sura, welcome, hifzToc, hifz })[name](arg);
   if (tg && tg.BackButton) name === 'home' || name === 'welcome' ? tg.BackButton.hide() : tg.BackButton.show();
 }
 function goBack() { if (!$sheet.hidden) return closeSheet(); if (back) { const b = back; back = null; return b(); } go('home'); }
@@ -187,6 +199,7 @@ function home() {
       <nav class="list" style="margin-top:20px" aria-label="Разделы">
         <button data-act="review" ${dl.length ? '' : 'disabled'}><span>Повторить забытые<span class="sub">${dl.length ? 'Слова, которые пора освежить' : 'Сегодня повторять нечего'}</span></span><b>${dl.length}</b></button>
         <button data-go="sura" data-n="${cur.sura ?? ''}" data-set="${esc(cur.id)}"><span>${esc(cur.title)}<span class="sub">${cur.sura ? 'Читать по аятам' : 'Набор слов'}</span></span><b>${curDone} из ${cur.words.length}</b></button>
+        <button data-go="hifzToc"><span>Хифз<span class="sub">Учить суры наизусть по аятам</span></span><b>${hifzDone()}</b></button>
         <button data-go="toc"><span>Все суры<span class="sub">Аль-Фатиха и джуз «Амма»</span></span><b>${D.sets.length}</b></button>
       </nav>
       ${cov ? `<p class="note" style="margin-top:16px">${esc(cov)}</p>` : ''}
@@ -278,6 +291,84 @@ function drawResult() {
   </div>`;
 }
 
+/* ---------- хифз ---------- */
+const learnedAyahs = (n) => S.h[n] || [];
+function hifzDone() { return Object.values(S.h).reduce((a, x) => a + x.length, 0); }
+function hifzToc() {
+  $where.textContent = 'Хифз';
+  const list = [...SIDX].sort((a, b) => (a.n === 1 ? -1 : b.n === 1 ? 1 : b.n - a.n));
+  $view.innerHTML = `<div class="narrow stack">
+    <h2>Учите суры наизусть, аят за аятом</h2>
+    <p class="muted">Слушайте аят несколько раз, повторяйте за чтецом, потом спрячьте текст и проверьте себя.</p>
+    <div class="list">${list.map((x) => {
+      const k = learnedAyahs(x.n).length;
+      return `<button data-go="hifz" data-n="${x.n}"><span>${x.n}. ${esc(x.title)}<span class="sub">${k ? `выучено ${k} из ${x.ayahs}` : `${x.ayahs} ${plural(x.ayahs, 'аят', 'аята', 'аятов')}`}</span></span><b>${Math.round((k / x.ayahs) * 100)}%</b></button>`;
+    }).join('')}</div>
+  </div>`;
+}
+let HZ = null;
+async function hifz(arg) {
+  const n = +((arg && arg.n) || (HZ && HZ.n));
+  if (!HZ || HZ.n !== n) {
+    const done = learnedAyahs(n);
+    HZ = { n, i: 0, hide: false, open: new Set(), data: null };
+    $view.innerHTML = '<p class="muted">Открываем суру…</p>';
+    try { HZ.data = suraCache[n] = suraCache[n] || await (await fetch(`data/suras/${n}.json?v=4`)).json(); }
+    catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
+    const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
+    HZ.i = firstNew < 0 ? 0 : firstNew;
+  }
+  if (screen !== 'hifz') return;
+  back = () => go('hifzToc');
+  drawHifz();
+}
+function drawHifz() {
+  const { data, i, hide, open } = HZ, a = data.ayahs[i], total = data.ayahs.length;
+  const done = learnedAyahs(HZ.n), isDone = done.includes(a.n);
+  $where.textContent = data.title;
+  const words = a.words.map((x, j) => {
+    const cls = hide && !open.has(j) ? 'hid' : '';
+    return `<button class="${cls}" data-act="hword" data-j="${j}" data-url="${esc(locUrl(HZ.n, a.n, j + 1))}">${esc(x.t)}</button>`;
+  }).join(' ');
+  $view.innerHTML = `<div class="narrow stack">
+    <h2>${esc(data.title)}</h2>
+    <p class="muted">Аят ${a.n} из ${total}, выучено ${done.length}</p>
+    ${bar(done.length, total)}
+    ${i === 0 && HZ.n !== 1 && HZ.n !== 9 ? `<div class="sound"><button class="snd" data-act="play" data-url="${esc(ayahUrl(1, 1, S.qari))}">${ICON}Бисмилля перед сурой</button></div>` : ''}
+    <div class="page hz"><div class="chips" lang="ar">${words}</div>
+      <p class="note" style="margin-top:14px">${hide ? 'Вспомните аят. Коснитесь слова, чтобы открыть и послушать его.' : esc(a.ru)}</p></div>
+    <button class="btn" data-act="hplay">${ICON}Слушать ${S.rep > 1 ? S.rep + ' ' + plural(S.rep, 'раз', 'раза', 'раз') : ''}</button>
+    <div class="seg" role="group" aria-label="Сколько раз повторять">${[1, 3, 5, 10].map((r) => `<button data-act="hrep" data-r="${r}" class="${S.rep === r ? 'on' : ''}">×${r}</button>`).join('')}</div>
+    <div class="qari" role="group" aria-label="Чтец">${QARI.map(([q, t]) => `<button data-act="hqari" data-q="${q}" class="${S.qari === q ? 'on' : ''}">${t}</button>`).join('')}</div>
+    <div class="row2">
+      <button class="btn ghost" data-act="hhide">${hide ? 'Показать текст' : 'Спрятать текст'}</button>
+      <button class="btn ghost" data-act="hlink" ${i ? '' : 'disabled'}>Связать с прошлыми</button>
+    </div>
+    <button class="btn ${isDone ? 'ghost' : 'okb'}" data-act="hdone">${isDone ? 'Аят выучен, снять отметку' : 'Выучила этот аят'}</button>
+    <div class="row2">
+      <button class="btn ghost" data-act="hstep" data-d="-1" ${i ? '' : 'disabled'}>Предыдущий</button>
+      <button class="btn ghost" data-act="hstep" data-d="1" ${i < total - 1 ? '' : 'disabled'}>Следующий</button>
+    </div>
+  </div>`;
+}
+function hifzAct(a, t) {
+  const ay = HZ.data.ayahs[HZ.i];
+  if (a === 'hplay') return play(Array(S.rep).fill(ayahUrl(HZ.n, ay.n, S.qari)), t);
+  if (a === 'hqari') { S.qari = t.dataset.q; save(); player.pause(); return drawHifz(); }
+  if (a === 'hrep') { S.rep = +t.dataset.r; save(); return drawHifz(); }
+  if (a === 'hhide') { HZ.hide = !HZ.hide; HZ.open = new Set(); return drawHifz(); }
+  if (a === 'hword') { if (HZ.hide) { HZ.open.add(+t.dataset.j); drawHifz(); } return play(t.dataset.url); }
+  if (a === 'hlink') return play(HZ.data.ayahs.slice(0, HZ.i + 1).map((x) => ayahUrl(HZ.n, x.n, S.qari)), t);
+  if (a === 'hstep') { HZ.i = Math.max(0, Math.min(HZ.data.ayahs.length - 1, HZ.i + +t.dataset.d)); HZ.hide = false; HZ.open = new Set(); player.pause(); window.scrollTo(0, 0); return drawHifz(); }
+  if (a === 'hdone') {
+    const list = learnedAyahs(HZ.n).filter((x) => x !== ay.n);
+    if (!learnedAyahs(HZ.n).includes(ay.n)) { list.push(ay.n); haptic('ok'); }
+    S.h[HZ.n] = list.sort((x, y) => x - y); save();
+    if (list.includes(ay.n) && HZ.i < HZ.data.ayahs.length - 1) { HZ.i++; HZ.hide = false; HZ.open = new Set(); window.scrollTo(0, 0); }
+    return drawHifz();
+  }
+}
+
 /* ---------- оглавление ---------- */
 function toc() {
   $where.textContent = 'Суры';
@@ -288,7 +379,7 @@ function toc() {
       const k = s.words.filter((id) => P[id]).length;
       return `<button data-go="sura" data-n="${s.sura ?? ''}" data-set="${esc(s.id)}"><span>${s.sura ? s.sura + '. ' : ''}${esc(s.title)}<span class="sub">${k} из ${s.words.length} ${plural(s.words.length, 'слова', 'слов', 'слов')}${s.id === S.set ? ', учите сейчас' : ''}</span></span><b>${s.words.length ? Math.round((k / s.words.length) * 100) : 0}%</b></button>`;
     }).join('')}</div>
-    <p class="credits">${[].concat(m.attribution || [], 'Озвучка слов: Quran.com. Чтение аятов: Мишари Рашид аль-Афаси, everyayah.com.').map(esc).join('<br>')}</p>
+    <p class="credits">${[].concat(m.attribution || [], 'Озвучка слов: Quran.com. Чтение аятов: Мишари Рашид аль-Афаси, в хифзе также Махмуд Халиль аль-Хусари и Мухаммад Сиддик аль-Миншави, everyayah.com.').map(esc).join('<br>')}</p>
   </div>`;
 }
 
@@ -357,6 +448,7 @@ document.addEventListener('click', (e) => {
   if (t.dataset.go) return go(t.dataset.go, { n: t.dataset.n, set: t.dataset.set });
   const a = t.dataset.act;
   if (a === 'close') { if (e.target === t || t.tagName === 'BUTTON') closeSheet(); return; }
+  if (a && a[0] === 'h' && a !== 'hello') return hifzAct(a, t);
   if (a === 'hello') { S.hi = true; save(); haptic('ok'); return go('home'); }
   if (a === 'learn') return go('lesson', 'learn');
   if (a === 'review') return go('lesson', 'review');
@@ -377,9 +469,10 @@ document.addEventListener('click', (e) => {
     tg.BackButton && tg.BackButton.onClick(goBack);
   }
   try {
-    [D, COV] = await Promise.all([
-      fetch('data/words.json?v=3').then((r) => r.json()),
-      fetch('data/coverage.json?v=3').then((r) => r.json()).catch(() => null),
+    [D, COV, SIDX] = await Promise.all([
+      fetch('data/words.json?v=4').then((r) => r.json()),
+      fetch('data/coverage.json?v=4').then((r) => r.json()).catch(() => null),
+      fetch('data/suras/index.json?v=4').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
@@ -387,7 +480,7 @@ document.addEventListener('click', (e) => {
   }
   D.sets.forEach((s) => s.words.forEach((id) => { if (!setOf[id] && D.words[id]) { setOf[id] = s.id; order.push(id); } }));
   S.set = D.sets[0].id;
-  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi }; };
+  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi, h: b.s.h || {}, rep: b.s.rep || 3, qari: b.s.qari || 'Husary_Muallim_128kbps' }; };
   const local = loadLocal();
   apply(local);
   go(S.hi ? 'home' : 'welcome');

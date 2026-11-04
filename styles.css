@@ -101,3 +101,16 @@ p { text-wrap: pretty; }
 .vhead { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .chips button:not([class]) { color: var(--muted); }
 .card .word { line-height: 1.7; }
+
+/* Хифз */
+.hz .chips { justify-content: center; }
+.hz .chips button { color: var(--ink); }
+.chips .hid { filter: blur(9px); color: var(--muted); }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.seg button { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: none; font: 600 var(--s2)/1 var(--f-head); }
+.seg .on { border-color: var(--accent); color: var(--accent); }
+.btn svg { width: 20px; height: 20px; }
+.btn.okb { background: var(--ok); color: #0E1A14; }
+.qari { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.qari button { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: none; font: 500 var(--s1)/1.2 var(--f-text); padding: 6px 10px; }
+.qari .on { border-color: var(--accent); color: var(--accent); }
