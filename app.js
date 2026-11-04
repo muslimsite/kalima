@@ -38,6 +38,30 @@ function highlight(ar, form) {
 function suraTitle(n) { const s = D.sets.find((x) => x.sura === n); return s ? s.title : 'Сура ' + n; }
 function ref(ex) { return `«${suraTitle(ex.sura)}», ${ex.ayah}`; }
 
+/* ---------- звук ---------- */
+// Слова: записи пословного чтения Quran.com. Аяты: Мишари Рашид аль-Афаси (everyayah.com).
+const pad3 = (n) => String(n).padStart(3, '0');
+const wordUrl = (path) => 'https://audio.qurancdn.com/' + path;
+const locUrl = (s, a, w) => wordUrl(`wbw/${pad3(s)}_${pad3(a)}_${pad3(w)}.mp3`);
+const ayahUrl = (s, a) => `https://everyayah.com/data/Alafasy_128kbps/${pad3(s)}${pad3(a)}.mp3`;
+const player = new Audio();
+player.preload = 'none';
+let playingBtn = null;
+function play(url, btn) {
+  if (playingBtn) playingBtn.classList.remove('on');
+  if (playingBtn === btn && !player.paused) { player.pause(); playingBtn = null; return; }
+  player.src = url;
+  playingBtn = btn || null;
+  if (btn) btn.classList.add('on');
+  player.play().catch(() => { if (btn) { btn.classList.remove('on'); btn.classList.add('err'); } });
+}
+player.addEventListener('ended', () => { if (playingBtn) playingBtn.classList.remove('on'); playingBtn = null; });
+const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.4 18.4a9 9 0 0 0 0-12.8"/></svg>';
+function sounds(w) {
+  const ex = w.example;
+  return `<div class="sound">${ex.audio ? `<button class="snd" data-act="play" data-url="${esc(wordUrl(ex.audio))}">${ICON}Слово</button>` : ''}<button class="snd" data-act="play" data-url="${esc(ayahUrl(ex.sura, ex.ayah))}">${ICON}Аят</button></div>`;
+}
+
 /* ---------- хранение ---------- */
 const LS = 'kalima.v1';
 function pack() {
@@ -194,6 +218,7 @@ function drawCard() {
         <span class="ayah" lang="ar" style="font-size:1.6rem">${highlight(w.example.ar, w.example.form)}</span>
         <span class="note">${esc(w.example.ru)} ${esc(ref(w.example))}</span>` : `<span class="note">Коснитесь, чтобы увидеть перевод</span>`}
     </button>
+    ${sounds(w)}
     ${L.flipped ? `<div class="row2"><button class="btn ghost" data-act="next-card">Ещё не помню</button><button class="btn" data-act="next-card">Помню</button></div>` : `<button class="btn ghost" data-act="flip">Показать перевод</button>`}
   </div>`;
 }
@@ -219,6 +244,7 @@ function drawTest() {
       <p class="ayah" lang="ar">${highlight(w.example.ar, w.example.form)}</p>
       <div class="gloss"><span>${esc(ref(w.example))}</span></div>
     </div>
+    ${sounds(w)}
     <div class="ans" role="group" aria-label="Варианты ответа">
       ${L.opts.map((o, i) => `<button data-act="answer" data-i="${i}">${esc(o)}</button>`).join('')}
     </div>
@@ -262,7 +288,7 @@ function toc() {
       const k = s.words.filter((id) => P[id]).length;
       return `<button data-go="sura" data-n="${s.sura ?? ''}" data-set="${esc(s.id)}"><span>${s.sura ? s.sura + '. ' : ''}${esc(s.title)}<span class="sub">${k} из ${s.words.length} ${plural(s.words.length, 'слова', 'слов', 'слов')}${s.id === S.set ? ', учите сейчас' : ''}</span></span><b>${s.words.length ? Math.round((k / s.words.length) * 100) : 0}%</b></button>`;
     }).join('')}</div>
-    <p class="credits">${[].concat(m.attribution || []).map(esc).join('<br>')}</p>
+    <p class="credits">${[].concat(m.attribution || [], 'Озвучка слов: Quran.com. Чтение аятов: Мишари Рашид аль-Афаси, everyayah.com.').map(esc).join('<br>')}</p>
   </div>`;
 }
 
@@ -290,11 +316,12 @@ async function sura(arg) {
     <p class="muted">Вы узнаёте ${k} из ${uniq.length} ${plural(uniq.length, 'слова', 'слов', 'слов')} этой суры</p>
     ${bar(k, Math.max(uniq.length, 1))}
     <p class="legend"><span><i style="background:var(--ok)"></i>знаете</span><span><i style="background:var(--accent)"></i>учите</span><span><i style="border:1px solid var(--line)"></i>новое, коснитесь</span></p>
-    ${data.ayahs.map((a) => `<div class="verse"><span class="n">Аят ${a.n}</span><div class="chips" lang="ar">${a.words.map((x) => {
+    ${data.ayahs.map((a) => `<div class="verse"><div class="vhead"><span class="n">Аят ${a.n}</span><button class="snd" data-act="play" data-url="${esc(ayahUrl(data.sura, a.n))}" aria-label="Послушать аят ${a.n}">${ICON}Аят</button></div><div class="chips" lang="ar">${a.words.map((x, j) => {
       x = { t: x.t, id: x.id || (x.ids || []).find((i) => D.words[i]) };
-      if (!x.id || !D.words[x.id]) return `<span>${esc(x.t)}</span>`;
+      const loc = esc(locUrl(data.sura, a.n, j + 1));
+      if (!x.id || !D.words[x.id]) return `<button data-act="play" data-url="${loc}" aria-label="Послушать слово">${esc(x.t)}</button>`;
       const cls = P[x.id] ? (P[x.id][0] >= 2 ? 'k' : 'lrn') : 'nw';
-      return `<button class="${cls}" data-act="word" data-id="${esc(x.id)}">${esc(x.t)}</button>`;
+      return `<button class="${cls}" data-act="word" data-id="${esc(x.id)}" data-url="${loc}">${esc(x.t)}</button>`;
     }).join(' ')}</div><p class="note">${esc(a.ru)}</p></div>`).join('')}
     <button class="btn" data-act="learn">Учить слова этой суры</button>
   </div>`;
@@ -306,13 +333,14 @@ function drawSet(st) {
     <div class="list">${st.words.map((id) => `<button data-act="word" data-id="${esc(id)}"><span><span class="ar-s" lang="ar">${esc(W(id).ar)}</span> ${esc(first(W(id).ru))}</span><b>${P[id] ? (P[id][0] >= 2 ? 'знаю' : 'учу') : 'новое'}</b></button>`).join('')}</div>
     <button class="btn" data-act="learn">Учить эти слова</button></div>`;
 }
-function openSheet(id) {
+function openSheet(id, url) {
   const w = W(id);
   const st = P[id];
   $sheet.hidden = false;
   $sheet.innerHTML = `<div class="sheet-wrap" data-act="close"><div class="sheet" role="dialog" aria-label="Слово">
     <span class="word" lang="ar">${esc(w.ar)}</span>
     <span class="ru">${esc(w.translit)}: ${esc(w.ru)}</span>
+    <div class="sound"><button class="snd" data-act="play" data-url="${esc(url || (w.example.audio ? wordUrl(w.example.audio) : ayahUrl(w.example.sura, w.example.ayah)))}">${ICON}Послушать</button></div>
     ${w.root ? `<span class="note">Корень <span lang="ar">${esc(w.root)}</span>${w.freq ? `, слово встречается в Коране ${w.freq} ${plural(w.freq, 'раз', 'раза', 'раз')}` : ''}</span>` : ''}
     ${w.note ? `<span class="note">${esc(w.note)}</span>` : ''}
     ${st ? `<p class="note">Повтор ${whenLabel(id)}</p>` : `<button class="btn" data-act="pin" data-id="${esc(id)}">Учить в следующем уроке</button>`}
@@ -336,7 +364,8 @@ document.addEventListener('click', (e) => {
   if (a === 'next-card') { L.ci++; L.flipped = false; return L.ci < L.cards.length ? drawCard() : drawTest(); }
   if (a === 'answer') return answer(+t.dataset.i);
   if (a === 'next-q') { L.qi++; return drawTest(); }
-  if (a === 'word') return openSheet(t.dataset.id);
+  if (a === 'word') { if (t.dataset.url) play(t.dataset.url); return openSheet(t.dataset.id, t.dataset.url); }
+  if (a === 'play') { e.stopPropagation(); return play(t.dataset.url, t); }
   if (a === 'pin') { const id = t.dataset.id; if (!S.pin.includes(id)) S.pin.unshift(id); save(); closeSheet(); return; }
 });
 

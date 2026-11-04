@@ -91,3 +91,13 @@ p { text-wrap: pretty; }
 .welcome h1 { color: var(--ok); }
 .welcome .lead { margin-top: 0; }
 .welcome .btn { max-width: 420px; background: var(--ok); color: #0E1A14; }
+
+/* Звук */
+.sound { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.snd { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--ink); font: 500 var(--s1)/1 var(--f-text); }
+.snd svg { width: 18px; height: 18px; color: var(--accent); }
+.snd.on { border-color: var(--accent); color: var(--accent); }
+.snd.err { opacity: .5; }
+.vhead { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.chips button:not([class]) { color: var(--muted); }
+.card .word { line-height: 1.7; }
