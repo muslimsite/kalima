@@ -162,7 +162,7 @@ function go(name, arg) {
   back = null;
   closeSheet();
   window.scrollTo(0, 0);
-  ({ home, lesson, toc, sura, welcome, hifzToc, hifz })[name](arg);
+  ({ home, words, lesson, toc, sura, welcome, hifzToc, hifz })[name](arg);
   if (tg && tg.BackButton) name === 'home' || name === 'welcome' ? tg.BackButton.hide() : tg.BackButton.show();
 }
 function goBack() { if (!$sheet.hidden) return closeSheet(); if (back) { const b = back; back = null; return b(); } go('home'); }
@@ -181,6 +181,33 @@ function welcome() {
 /* ---------- главная ---------- */
 function home() {
   $where.textContent = '';
+  const dl = due().length;
+  const nw = nextNew(1)[0];
+  const t = S.hd[today()] || 0, g = S.goal;
+  const wordsSub = dl ? `${dl} ${plural(dl, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения` : nw ? `Следующее слово «${esc(W(nw).translit)}»` : 'Все слова выучены';
+  const hifzSub = hifzDone() ? `Сегодня ${t} из ${g} ${plural(g, 'аята', 'аятов', 'аятов')}` : 'Начните с «Аль-Фатихи»';
+  $view.innerHTML = `<div class="narrow stack">
+    <h1>Что будем делать сегодня?</h1>
+    <div class="choices">
+      <button class="choice c-words" data-go="words">
+        <span class="c-ar" lang="ar" aria-hidden="true">كَلِمَة</span>
+        <span class="c-title">Учить слова Корана</span>
+        <span class="c-desc">Урок из 10 слов: карточки, тест и повторение</span>
+        <span class="c-stat">${wordsSub}</span>
+      </button>
+      <button class="choice c-hifz" data-go="hifzToc">
+        <span class="c-ar" lang="ar" aria-hidden="true">حِفْظ</span>
+        <span class="c-title">Хифз: учить наизусть</span>
+        <span class="c-desc">Суры по аятам с учебным чтением Хусари</span>
+        <span class="c-stat">${hifzSub}</span>
+      </button>
+    </div>
+    <button class="btn ghost" data-go="toc">Читать суры по словам</button>
+  </div>`;
+}
+
+function words() {
+  $where.textContent = 'Слова';
   const dl = due();
   const nw = nextNew(1)[0];
   const featured = nw || dl[0] || order[0];
@@ -204,7 +231,6 @@ function home() {
       <nav class="list" style="margin-top:20px" aria-label="Разделы">
         <button data-act="review" ${dl.length ? '' : 'disabled'}><span>Повторить забытые<span class="sub">${dl.length ? 'Слова, которые пора освежить' : 'Сегодня повторять нечего'}</span></span><b>${dl.length}</b></button>
         <button data-go="sura" data-n="${cur.sura ?? ''}" data-set="${esc(cur.id)}"><span>${esc(cur.title)}<span class="sub">${cur.sura ? 'Читать по аятам' : 'Набор слов'}</span></span><b>${curDone} из ${cur.words.length}</b></button>
-        <button data-go="hifzToc"><span>Хифз<span class="sub">Учить суры наизусть по аятам</span></span><b>${hifzDone()}</b></button>
         <button data-go="toc"><span>Все суры<span class="sub">Аль-Фатиха и джуз «Амма»</span></span><b>${D.sets.length}</b></button>
       </nav>
       ${cov ? `<p class="note" style="margin-top:16px">${esc(cov)}</p>` : ''}
@@ -218,7 +244,7 @@ function lesson(mode) {
   const dl = due().slice(0, MAX_REVIEW);
   const nw = mode === 'review' ? [] : nextNew(NEW_PER_LESSON);
   L = { cards: nw.slice(), ci: 0, flipped: false, queue: shuffle([...nw, ...dl]), all: [...nw, ...dl], failed: new Set(), qi: 0, answered: false, total: nw.length + dl.length };
-  if (!L.total) return go('home');
+  if (!L.total) return go('words');
   $where.textContent = mode === 'review' ? 'Повтор' : 'Урок';
   back = null;
   L.cards.length ? drawCard() : drawTest();
@@ -292,7 +318,7 @@ function drawResult() {
     <p class="muted">Когда слово вернётся на повтор</p>
     <div class="list">${L.all.map((id) => `<div><span><span class="ar-s" lang="ar">${esc(W(id).ar)}</span> <span>${esc(first(W(id).ru))}</span></span><b>${whenLabel(id)}</b></div>`).join('')}</div>
     ${nextNew(1).length ? '<button class="btn" data-act="learn">Ещё 10 слов</button>' : ''}
-    <button class="btn ghost" data-go="home">На главную</button>
+    <button class="btn ghost" data-go="words">Готово</button>
   </div>`;
 }
 
@@ -393,7 +419,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=5`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=6`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -557,9 +583,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=5').then((r) => r.json()),
-      fetch('data/coverage.json?v=5').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=5').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=6').then((r) => r.json()),
+      fetch('data/coverage.json?v=6').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=6').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
