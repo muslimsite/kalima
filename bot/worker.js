@@ -35,6 +35,11 @@ export default {
     const secret = await secretOf(env.BOT_TOKEN);
     const openBtn = { inline_keyboard: [[{ text: BUTTON, web_app: { url: env.APP_URL } }], [{ text: 'Канал Медины', url: CHANNEL }]] };
 
+    if (url.pathname === '/me') {
+      const me = await api('getMe', {});
+      return new Response(me.ok ? '@' + me.result.username : 'Ошибка', { headers: { 'content-type': 'text/plain; charset=utf-8' } });
+    }
+
     if (url.pathname === '/setup') {
       const out = {
         webhook: await api('setWebhook', { url: `${url.origin}/hook`, secret_token: secret, allowed_updates: ['message'], drop_pending_updates: true }),
