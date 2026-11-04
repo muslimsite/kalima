@@ -1,0 +1,9 @@
+name = "kalima-bot"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+APP_URL = "https://muslimsite.github.io/kalima/"
+
+# Токен бота НЕ пишется сюда. Он хранится секретом:
+#   npx wrangler secret put BOT_TOKEN
