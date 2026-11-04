@@ -163,7 +163,7 @@ function welcome() {
 
 /* ---------- главная ---------- */
 function home() {
-  $where.textContent = 'Вечернее чтение';
+  $where.textContent = '';
   const dl = due();
   const nw = nextNew(1)[0];
   const featured = nw || dl[0] || order[0];
@@ -378,8 +378,8 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV] = await Promise.all([
-      fetch('data/words.json').then((r) => r.json()),
-      fetch('data/coverage.json').then((r) => r.json()).catch(() => null),
+      fetch('data/words.json?v=3').then((r) => r.json()),
+      fetch('data/coverage.json?v=3').then((r) => r.json()).catch(() => null),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
