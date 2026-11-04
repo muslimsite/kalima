@@ -2,12 +2,16 @@
 // /start → приветствие с кнопкой, которая открывает мини-приложение.
 // /setup → один раз подключает вебхук, кнопку меню и описание бота.
 
+const CHANNEL = 'https://t.me/+06WVHdxoRekwZGYy';
 const HELLO =
   'Ассаляму алейкум, сестра!\n\n' +
   'Рада видеть тебя в тренажёре «Калима». Занимайся, учи слова Корана и получай свою награду.\n\n' +
-  'Нажми на кнопку ниже.';
+  'Нажми на кнопку ниже.\n\n' +
+  'Этот бот создала Медина.\n\n' +
+  'Мой канал про вайб-кодинг: ' + CHANNEL + '\n' +
+  'Показываю, что делаю в своих проектах: сайты, боты, мини-приложения и всё, что можно собрать с нейросетями без знания программирования. Заходите, сёстры, там много полезного 🌿';
 const DESCRIPTION =
-  'Ассаляму алейкум, сестра! Рада видеть тебя в тренажёре. Занимайся, учи слова Корана и получай свою награду. Нажми на кнопку ниже.';
+  'Ассаляму алейкум, сестра! Рада видеть тебя в тренажёре. Занимайся, учи слова Корана и получай свою награду. Нажми на кнопку ниже.\n\nБота создала Медина. Канал про вайб-кодинг: ' + CHANNEL;
 const SHORT = 'Тренажёр слов Корана: 10 слов за урок, чтобы понимать текст при чтении.';
 const BUTTON = 'Открыть тренажёр';
 
@@ -29,7 +33,7 @@ export default {
         body: JSON.stringify(body),
       }).then((r) => r.json());
     const secret = await secretOf(env.BOT_TOKEN);
-    const openBtn = { inline_keyboard: [[{ text: BUTTON, web_app: { url: env.APP_URL } }]] };
+    const openBtn = { inline_keyboard: [[{ text: BUTTON, web_app: { url: env.APP_URL } }], [{ text: 'Канал Медины', url: CHANNEL }]] };
 
     if (url.pathname === '/setup') {
       const out = {
@@ -53,6 +57,7 @@ export default {
           chat_id: msg.chat.id,
           text: isStart ? HELLO : 'Чтобы заниматься, нажми на кнопку ниже.',
           reply_markup: openBtn,
+          link_preview_options: { is_disabled: true },
         });
       }
       return new Response('ok');
