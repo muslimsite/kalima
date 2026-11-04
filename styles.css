@@ -114,3 +114,23 @@ p { text-wrap: pretty; }
 .qari { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .qari button { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: none; font: 500 var(--s1)/1.2 var(--f-text); padding: 6px 10px; }
 .qari .on { border-color: var(--accent); color: var(--accent); }
+
+/* Трекер хифза */
+.track { background: var(--raise); border-radius: 20px; padding: 18px 16px; display: grid; gap: 12px; }
+.track-top { display: flex; justify-content: space-between; gap: 12px; font-size: var(--s1); color: var(--muted); }
+.track-top span:first-child { color: var(--ink); font-weight: 600; }
+.today { font-size: var(--s2); }
+.today b { font: 800 2.4rem/1 var(--f-head); color: var(--accent); margin-right: 4px; }
+.goal { display: grid; gap: 8px; }
+.road { position: relative; height: 10px; border-radius: 5px; background: var(--line); margin: 18px 22px 4px 0; }
+.road > i { position: absolute; inset: 0 auto 0 0; border-radius: 5px; background: var(--ok); }
+.road .stop { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--bg); border: 2px solid var(--muted); }
+.road .stop.done { border-color: var(--ok); background: var(--ok); }
+.road .crown { position: absolute; right: -22px; top: 50%; transform: translateY(-58%); width: 32px; height: 32px; color: var(--accent); }
+.road .crown svg { width: 100%; height: 100%; }
+.road .crown.done { color: var(--ok); }
+.road-labels { display: flex; justify-content: space-between; font-size: var(--s1); color: var(--muted); }
+.plan b { font-size: 1.15rem; }
+.remind { display: grid; gap: 10px; }
+.time { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.time input { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 600 1.25rem/1 var(--f-text); padding: 0 12px; color-scheme: dark; }

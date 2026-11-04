@@ -7,3 +7,12 @@ APP_URL = "https://muslimsite.github.io/kalima/"
 
 # Токен бота НЕ пишется сюда. Он хранится секретом:
 #   npx wrangler secret put BOT_TOKEN
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kalima-reminders"
+database_id = "4efa3590-7bda-45a6-9ab9-00081f482d33"
+
+# Каждые 5 минут бот проверяет, кому пора напомнить о хифзе
+[triggers]
+crons = ["*/5 * * * *"]

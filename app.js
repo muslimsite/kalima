@@ -14,11 +14,11 @@ const today = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60
 
 let D = null;          // words.json
 let COV = null;
-let SIDX = [];       // suras/index.json        // coverage.json
+let SIDX = [];       // hifz/index.json: все 114 сур        // coverage.json
 let order = [];        // id слов в порядке обучения
 let setOf = {};        // id слова → id набора
 let P = {};            // прогресс: id → [коробка, день повтора]
-let S = { set: null, pin: [], hi: false, h: {}, rep: 3, qari: 'Husary_Muallim_128kbps' }; // выбранный набор, слова «учить следующими»
+let S = { set: null, pin: [], hi: false, h: {}, hd: {}, rep: 3, qari: 'Husary_Muallim_128kbps', goal: 3, rem: { on: false, time: '07:00' } }; // выбранный набор, слова «учить следующими»
 let screen = 'home';
 let back = null;
 
@@ -92,7 +92,10 @@ function save() {
   if (!cs) return;
   const chunks = body.p.match(/.{1,4000}/g) || [''];
   chunks.forEach((c, i) => cs.setItem('p' + i, c));
-  cs.setItem('meta', JSON.stringify({ t, n: chunks.length, s: S }));
+  const { h, hd, ...rest } = S;
+  cs.setItem('meta', JSON.stringify({ t, n: chunks.length, s: rest }));
+  cs.setItem('hz', JSON.stringify(h || {}));
+  cs.setItem('hd', JSON.stringify(hd || {}));
 }
 function loadLocal() {
   try { const b = JSON.parse(localStorage.getItem(LS) || 'null'); if (b) return b; } catch (e) {}
@@ -107,10 +110,12 @@ function loadCloud() {
       if (err || !v) { clearTimeout(timer); return res(null); }
       let m; try { m = JSON.parse(v); } catch (e) { clearTimeout(timer); return res(null); }
       const keys = Array.from({ length: m.n }, (_, i) => 'p' + i);
-      cs.getItems(keys, (e2, vals) => {
+      cs.getItems([...keys, 'hz', 'hd'], (e2, vals) => {
         clearTimeout(timer);
         if (e2 || !vals) return res(null);
-        res({ t: m.t, s: m.s, p: keys.map((k) => vals[k] || '').join('') });
+        let h = {}, hd = {};
+        try { h = JSON.parse(vals.hz || '{}'); hd = JSON.parse(vals.hd || '{}'); } catch (e) {}
+        res({ t: m.t, s: { ...m.s, h, hd }, p: keys.map((k) => vals[k] || '').join('') });
       });
     });
   });
@@ -299,12 +304,87 @@ function hifzToc() {
   const list = [...SIDX].sort((a, b) => (a.n === 1 ? -1 : b.n === 1 ? 1 : b.n - a.n));
   $view.innerHTML = `<div class="narrow stack">
     <h2>Учите суры наизусть, аят за аятом</h2>
+    ${tracker()}
+    ${reminderBox()}
     <p class="muted">Слушайте аят несколько раз, повторяйте за чтецом, потом спрячьте текст и проверьте себя.</p>
     <div class="list">${list.map((x) => {
       const k = learnedAyahs(x.n).length;
-      return `<button data-go="hifz" data-n="${x.n}"><span>${x.n}. ${esc(x.title)}<span class="sub">${k ? `выучено ${k} из ${x.ayahs}` : `${x.ayahs} ${plural(x.ayahs, 'аят', 'аята', 'аятов')}`}</span></span><b>${Math.round((k / x.ayahs) * 100)}%</b></button>`;
+      return `<button data-go="hifz" data-n="${x.n}"><span>${x.n}. ${esc(x.title)}<span class="sub">Джуз ${x.juz}, ${k ? `выучено ${k} из ${x.ayahs}` : `${x.ayahs} ${plural(x.ayahs, 'аят', 'аята', 'аятов')}`}</span></span><b>${Math.round((k / x.ayahs) * 100)}%</b></button>`;
     }).join('')}</div>
   </div>`;
+}
+const QURAN_AYAHS = 6236;
+const CROWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>';
+const BELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>';
+const dateRu = (days) => new Date(Date.now() + days * 86400000).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+function streak() {
+  let d = today(), n = 0;
+  if ((S.hd[d] || 0) < S.goal) d--; // сегодня ещё не закончено — считаем со вчера
+  while ((S.hd[d] || 0) >= S.goal) { n++; d--; }
+  return n;
+}
+function tracker() {
+  const learned = hifzDone();
+  const amma = SIDX.filter((x) => x.n === 1 || x.n >= 78).reduce((a, x) => a + x.ayahs, 0) || 571;
+  const t = S.hd[today()] || 0, g = S.goal;
+  const pct = (x) => Math.min(100, (x / QURAN_AYAHS) * 100);
+  const stops = [[7, 'Аль-Фатиха'], [amma, 'Аль-Фатиха и джуз «Амма»'], [QURAN_AYAHS / 2, 'Половина Корана']];
+  const left = (n) => Math.ceil(Math.max(0, n - learned) / g);
+  const st = streak();
+  return `<section class="track" aria-label="Мой путь хифза">
+    <div class="track-top"><span>Мой путь хифза</span><span>${st ? `${st} ${plural(st, 'день', 'дня', 'дней')} подряд` : 'Начните сегодня'}</span></div>
+    <p class="today"><b>${t}</b> из ${g} ${plural(g, 'аята', 'аятов', 'аятов')} сегодня</p>
+    ${t >= g ? '<p class="note" style="color:var(--ok)">Цель на сегодня выполнена, машаАллах!</p>' : ''}
+    ${bar(Math.min(t, g), g)}
+    <div class="goal"><span class="muted">Цель в день</span><div class="seg">${[1, 3, 5, 10].map((r) => `<button data-act="hgoal" data-g="${r}" class="${g === r ? 'on' : ''}">${r}</button>`).join('')}</div></div>
+    <div class="road" role="img" aria-label="Выучено ${learned} из ${QURAN_AYAHS} аятов Корана">
+      <i style="width:${Math.max(pct(learned), learned ? 1 : 0)}%"></i>
+      ${stops.map(([x, name]) => `<span class="stop ${learned >= x ? 'done' : ''}" style="left:${pct(x)}%" title="${esc(name)}"></span>`).join('')}
+      <span class="crown ${learned >= QURAN_AYAHS ? 'done' : ''}">${CROWN}</span>
+    </div>
+    <div class="road-labels"><span>Выучено ${learned} ${plural(learned, 'аят', 'аята', 'аятов')}</span><span>Весь Коран</span></div>
+    <div class="list plan">
+      <div><span>Аль-Фатиха и джуз «Амма»<span class="sub">${amma} ${plural(amma, 'аят', 'аята', 'аятов')}</span></span><b>${learned >= amma ? 'выучено' : 'к ' + dateRu(left(amma))}</b></div>
+      <div><span>Весь Коран<span class="sub">${QURAN_AYAHS} аятов, по ${g} в день</span></span><b>к ${dateRu(left(QURAN_AYAHS))}</b></div>
+    </div>
+  </section>`;
+}
+function reminderBox() {
+  const r = S.rem;
+  const inTg = !!(tg && tg.initData);
+  return `<section class="track" aria-label="Напоминание">
+    <div class="track-top"><span>Напоминание от бота</span><span>${r.on ? 'включено' : 'выключено'}</span></div>
+    ${inTg ? `<div class="remind">
+      <label class="time"><span class="muted">Каждый день в</span><input id="remTime" type="time" value="${esc(r.time)}"></label>
+      <button class="btn ${r.on ? 'ghost' : ''}" data-act="hrem">${BELL}${r.on ? 'Сохранить время' : 'Напоминать мне'}</button>
+      ${r.on ? `<div class="row2"><button class="btn ghost" data-act="hremtest">Прислать пробное</button><button class="btn ghost" data-act="hremoff">Выключить</button></div>` : ''}
+      <p class="note" id="remMsg">${r.on ? `Бот напишет в ${esc(r.time)} и напомнит про ${S.goal} ${plural(S.goal, 'аят', 'аята', 'аятов')}.` : 'Бот будет присылать сообщение с кнопкой «Открыть хифз».'}</p>
+    </div>` : '<p class="note">Напоминания работают, когда приложение открыто в Telegram.</p>'}
+  </section>`;
+}
+const API = 'https://kalima-bot.medina-vibecode.workers.dev/api/remind';
+function remPayload(extra) {
+  const [hh, mm] = (S.rem.time || '07:00').split(':').map(Number);
+  const tz = new Date().getTimezoneOffset();
+  return { initData: tg ? tg.initData : '', enabled: S.rem.on, utcMin: hh * 60 + mm + tz, tz, goal: S.goal, learned: hifzDone(), ...extra };
+}
+async function sendRem(extra) {
+  const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(remPayload(extra)) });
+  if (!r.ok) throw new Error('remind ' + r.status);
+}
+function syncProgress() { if (S.rem.on && tg && tg.initData) sendRem({ progressOnly: true }).catch(() => {}); }
+async function remAct(a) {
+  const msg = (t) => { const el = document.getElementById('remMsg'); if (el) el.textContent = t; };
+  if (a === 'hremoff') S.rem.on = false;
+  else if (a === 'hrem') {
+    const v = document.getElementById('remTime').value;
+    if (v) S.rem.time = v;
+    if (!S.rem.on && tg && tg.requestWriteAccess) await new Promise((res) => { try { tg.requestWriteAccess(() => res()); } catch (e) { res(); } });
+    S.rem.on = true;
+  }
+  save();
+  try { await sendRem(a === 'hremtest' ? { test: true } : {}); haptic('ok'); hifzToc(); if (a === 'hremtest') msg('Пробное напоминание отправлено, загляните в чат с ботом.'); }
+  catch (e) { hifzToc(); msg('Не получилось связаться с ботом. Проверьте интернет и попробуйте ещё раз.'); }
 }
 let HZ = null;
 async function hifz(arg) {
@@ -313,7 +393,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = suraCache[n] = suraCache[n] || await (await fetch(`data/suras/${n}.json?v=4`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=5`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -326,9 +406,9 @@ function drawHifz() {
   const { data, i, hide, open } = HZ, a = data.ayahs[i], total = data.ayahs.length;
   const done = learnedAyahs(HZ.n), isDone = done.includes(a.n);
   $where.textContent = data.title;
-  const words = a.words.map((x, j) => {
+  const words = a.w.map((x, j) => {
     const cls = hide && !open.has(j) ? 'hid' : '';
-    return `<button class="${cls}" data-act="hword" data-j="${j}" data-url="${esc(locUrl(HZ.n, a.n, j + 1))}">${esc(x.t)}</button>`;
+    return `<button class="${cls}" data-act="hword" data-j="${j}" data-url="${esc(locUrl(HZ.n, a.n, j + 1))}">${esc(x)}</button>`;
   }).join(' ');
   $view.innerHTML = `<div class="narrow stack">
     <h2>${esc(data.title)}</h2>
@@ -352,6 +432,8 @@ function drawHifz() {
   </div>`;
 }
 function hifzAct(a, t) {
+  if (a === 'hgoal') { S.goal = +t.dataset.g; save(); syncProgress(); return hifzToc(); }
+  if (a === 'hrem' || a === 'hremoff' || a === 'hremtest') return remAct(a);
   const ay = HZ.data.ayahs[HZ.i];
   if (a === 'hplay') return play(Array(S.rep).fill(ayahUrl(HZ.n, ay.n, S.qari)), t);
   if (a === 'hqari') { S.qari = t.dataset.q; save(); player.pause(); return drawHifz(); }
@@ -362,7 +444,12 @@ function hifzAct(a, t) {
   if (a === 'hstep') { HZ.i = Math.max(0, Math.min(HZ.data.ayahs.length - 1, HZ.i + +t.dataset.d)); HZ.hide = false; HZ.open = new Set(); player.pause(); window.scrollTo(0, 0); return drawHifz(); }
   if (a === 'hdone') {
     const list = learnedAyahs(HZ.n).filter((x) => x !== ay.n);
-    if (!learnedAyahs(HZ.n).includes(ay.n)) { list.push(ay.n); haptic('ok'); }
+    const added = !learnedAyahs(HZ.n).includes(ay.n);
+    if (added) { list.push(ay.n); haptic('ok'); }
+    const d = today();
+    S.hd[d] = Math.max(0, (S.hd[d] || 0) + (added ? 1 : -1));
+    Object.keys(S.hd).forEach((k) => { if (+k < d - 120) delete S.hd[k]; });
+    setTimeout(syncProgress, 0);
     S.h[HZ.n] = list.sort((x, y) => x - y); save();
     if (list.includes(ay.n) && HZ.i < HZ.data.ayahs.length - 1) { HZ.i++; HZ.hide = false; HZ.open = new Set(); window.scrollTo(0, 0); }
     return drawHifz();
@@ -470,9 +557,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=4').then((r) => r.json()),
-      fetch('data/coverage.json?v=4').then((r) => r.json()).catch(() => null),
-      fetch('data/suras/index.json?v=4').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=5').then((r) => r.json()),
+      fetch('data/coverage.json?v=5').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=5').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
@@ -480,10 +567,10 @@ document.addEventListener('click', (e) => {
   }
   D.sets.forEach((s) => s.words.forEach((id) => { if (!setOf[id] && D.words[id]) { setOf[id] = s.id; order.push(id); } }));
   S.set = D.sets[0].id;
-  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi, h: b.s.h || {}, rep: b.s.rep || 3, qari: b.s.qari || 'Husary_Muallim_128kbps' }; };
+  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi, h: b.s.h || {}, rep: b.s.rep || 3, qari: b.s.qari || 'Husary_Muallim_128kbps', hd: b.s.hd || {}, goal: b.s.goal || 3, rem: b.s.rem || { on: false, time: '07:00' } }; };
   const local = loadLocal();
   apply(local);
-  go(S.hi ? 'home' : 'welcome');
+  go(!S.hi ? 'welcome' : location.hash === '#hifz' ? 'hifzToc' : 'home');
   const remote = await loadCloud();
   if (remote && (!local || remote.t > local.t)) { apply(remote); if (screen === 'home' || (screen === 'welcome' && S.hi)) go('home'); }
 })();
