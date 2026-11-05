@@ -229,6 +229,7 @@ function words() {
         ${nw || dl.length ? `<button class="btn" data-act="learn">${dl.length && nw ? 'Начать урок' : nw ? 'Начать урок' : 'Повторить слова'}</button>` : `<p class="note">Все слова выучены. Новые появятся в следующих версиях словаря.</p>`}
       </div>
       <nav class="list" style="margin-top:20px" aria-label="Разделы">
+        ${(S.last || []).length ? `<button data-act="again"><span>Повторить прошлый урок<span class="sub">Те же ${S.last.length} ${plural(S.last.length, 'слово', 'слова', 'слов')}: карточки и тест ещё раз</span></span><b>${S.last.length}</b></button>` : ''}
         <button data-act="review" ${dl.length ? '' : 'disabled'}><span>Повторить забытые<span class="sub">${dl.length ? 'Слова, которые пора освежить' : 'Сегодня повторять нечего'}</span></span><b>${dl.length}</b></button>
         <button data-go="sura" data-n="${cur.sura ?? ''}" data-set="${esc(cur.id)}"><span>${esc(cur.title)}<span class="sub">${cur.sura ? 'Читать по аятам' : 'Набор слов'}</span></span><b>${curDone} из ${cur.words.length}</b></button>
         <button data-go="toc"><span>Все суры<span class="sub">Аль-Фатиха и джуз «Амма»</span></span><b>${D.sets.length}</b></button>
@@ -241,9 +242,17 @@ function words() {
 /* ---------- урок ---------- */
 let L = null;
 function lesson(mode) {
+  if (mode === 'again') {
+    // Повтор прошлого урока: те же карточки и тест, расписание повторов не меняется
+    const ids = (S.last || []).filter((id) => D.words[id]);
+    L = { mode, cards: ids.slice(), ci: 0, flipped: false, queue: shuffle(ids.slice()), all: ids.slice(), failed: new Set(), qi: 0, answered: false, total: ids.length };
+    if (!L.total) return go('words');
+    $where.textContent = 'Прошлый урок';
+    return drawCard();
+  }
   const dl = due().slice(0, MAX_REVIEW);
   const nw = mode === 'review' ? [] : nextNew(NEW_PER_LESSON);
-  L = { cards: nw.slice(), ci: 0, flipped: false, queue: shuffle([...nw, ...dl]), all: [...nw, ...dl], failed: new Set(), qi: 0, answered: false, total: nw.length + dl.length };
+  L = { mode, cards: nw.slice(), ci: 0, flipped: false, queue: shuffle([...nw, ...dl]), all: [...nw, ...dl], failed: new Set(), qi: 0, answered: false, total: nw.length + dl.length };
   if (!L.total) return go('words');
   $where.textContent = mode === 'review' ? 'Повтор' : 'Урок';
   back = null;
@@ -309,7 +318,7 @@ function answer(i) {
   document.getElementById('after').innerHTML = `<div class="stack"><p class="note">«${esc(w.translit)}»: ${esc(w.ru)}. Слово вернётся в конце урока.</p><button class="btn" data-act="next-q">Дальше</button></div>`;
 }
 function drawResult() {
-  L.all.forEach((id) => grade(id, !L.failed.has(id)));
+  if (L.mode !== 'again') { L.all.forEach((id) => grade(id, !L.failed.has(id))); S.last = L.all.slice(); }
   save();
   const okN = L.all.length - L.failed.size;
   $where.textContent = 'Итог';
@@ -318,6 +327,7 @@ function drawResult() {
     <p class="muted">Когда слово вернётся на повтор</p>
     <div class="list">${L.all.map((id) => `<div><span><span class="ar-s" lang="ar">${esc(W(id).ar)}</span> <span>${esc(first(W(id).ru))}</span></span><b>${whenLabel(id)}</b></div>`).join('')}</div>
     ${nextNew(1).length ? '<button class="btn" data-act="learn">Ещё 10 слов</button>' : ''}
+    <button class="btn ghost" data-act="again">Пройти этот урок ещё раз</button>
     <button class="btn ghost" data-go="words">Готово</button>
   </div>`;
 }
@@ -419,7 +429,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=6`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=7`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -434,7 +444,7 @@ function drawHifz() {
   $where.textContent = data.title;
   const words = a.w.map((x, j) => {
     const cls = hide && !open.has(j) ? 'hid' : '';
-    return `<button class="${cls}" data-act="hword" data-j="${j}" data-url="${esc(locUrl(HZ.n, a.n, j + 1))}">${esc(x)}</button>`;
+    return `<button class="${cls}" data-act="hword" data-j="${j}" data-url="${esc(locUrl(HZ.n, a.n, a.a ? a.a[j] : j + 1))}">${esc(x)}</button>`;
   }).join(' ');
   $view.innerHTML = `<div class="narrow stack">
     <h2>${esc(data.title)}</h2>
@@ -522,7 +532,7 @@ async function sura(arg) {
     <p class="legend"><span><i style="background:var(--ok)"></i>знаете</span><span><i style="background:var(--accent)"></i>учите</span><span><i style="border:1px solid var(--line)"></i>новое, коснитесь</span></p>
     ${data.ayahs.map((a) => `<div class="verse"><div class="vhead"><span class="n">Аят ${a.n}</span><button class="snd" data-act="play" data-url="${esc(ayahUrl(data.sura, a.n))}" aria-label="Послушать аят ${a.n}">${ICON}Аят</button></div><div class="chips" lang="ar">${a.words.map((x, j) => {
       x = { t: x.t, id: x.id || (x.ids || []).find((i) => D.words[i]) };
-      const loc = esc(locUrl(data.sura, a.n, j + 1));
+      const loc = esc(locUrl(data.sura, a.n, a.a ? a.a[j] : j + 1));
       if (!x.id || !D.words[x.id]) return `<button data-act="play" data-url="${loc}" aria-label="Послушать слово">${esc(x.t)}</button>`;
       const cls = P[x.id] ? (P[x.id][0] >= 2 ? 'k' : 'lrn') : 'nw';
       return `<button class="${cls}" data-act="word" data-id="${esc(x.id)}" data-url="${loc}">${esc(x.t)}</button>`;
@@ -565,6 +575,7 @@ document.addEventListener('click', (e) => {
   if (a === 'hello') { S.hi = true; save(); haptic('ok'); return go('home'); }
   if (a === 'learn') return go('lesson', 'learn');
   if (a === 'review') return go('lesson', 'review');
+  if (a === 'again') return go('lesson', 'again');
   if (a === 'flip') { L.flipped = !L.flipped; haptic(); return drawCard(); }
   if (a === 'next-card') { L.ci++; L.flipped = false; return L.ci < L.cards.length ? drawCard() : drawTest(); }
   if (a === 'answer') return answer(+t.dataset.i);
@@ -583,9 +594,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=6').then((r) => r.json()),
-      fetch('data/coverage.json?v=6').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=6').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=7').then((r) => r.json()),
+      fetch('data/coverage.json?v=7').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=7').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
@@ -593,7 +604,7 @@ document.addEventListener('click', (e) => {
   }
   D.sets.forEach((s) => s.words.forEach((id) => { if (!setOf[id] && D.words[id]) { setOf[id] = s.id; order.push(id); } }));
   S.set = D.sets[0].id;
-  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi, h: b.s.h || {}, rep: b.s.rep || 3, qari: b.s.qari || 'Husary_Muallim_128kbps', hd: b.s.hd || {}, goal: b.s.goal || 3, rem: b.s.rem || { on: false, time: '07:00' } }; };
+  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi, h: b.s.h || {}, rep: b.s.rep || 3, qari: b.s.qari || 'Husary_Muallim_128kbps', hd: b.s.hd || {}, goal: b.s.goal || 3, rem: b.s.rem || { on: false, time: '07:00' }, last: b.s.last || [] }; };
   const local = loadLocal();
   apply(local);
   go(!S.hi ? 'welcome' : location.hash === '#hifz' ? 'hifzToc' : 'home');
