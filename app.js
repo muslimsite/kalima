@@ -429,7 +429,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=9`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=10`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -594,9 +594,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=9').then((r) => r.json()),
-      fetch('data/coverage.json?v=9').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=9').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=10').then((r) => r.json()),
+      fetch('data/coverage.json?v=10').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=10').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
@@ -610,4 +610,6 @@ document.addEventListener('click', (e) => {
   go(!S.hi ? 'welcome' : location.hash === '#hifz' ? 'hifzToc' : 'home');
   const remote = await loadCloud();
   if (remote && (!local || remote.t > local.t)) { apply(remote); if (screen === 'home' || (screen === 'welcome' && S.hi)) go('home'); }
+  // Счётчик для автора: бот отмечает, что сестра открыла приложение (только номер аккаунта и сколько выучено).
+  if (tg && tg.initData) fetch(API.replace('/remind', '/seen'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ initData: tg.initData, words: Object.keys(P).length, hifz: hifzDone() }) }).catch(() => {});
 })();

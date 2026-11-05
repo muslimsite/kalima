@@ -34,6 +34,40 @@ async function checkInitData(initData, token) {
   try { return JSON.parse(p.get('user')); } catch (e) { return null; }
 }
 
+// Учёт пользователей: только номер аккаунта Telegram, даты и сколько выучено. Имён и сообщений не храним.
+async function touch(env, id, kind, words, hifz) {
+  const s = kind === 'start' ? 1 : 0, o = kind === 'open' ? 1 : 0;
+  await env.DB.prepare(
+    `INSERT INTO users (user_id, first_seen, last_seen, starts, opens, words, hifz) VALUES (?1, datetime('now'), datetime('now'), ?4, ?5, ?2, ?3)
+     ON CONFLICT(user_id) DO UPDATE SET last_seen = datetime('now'), starts = starts + ?4, opens = opens + ?5,
+       words = MAX(words, ?2), hifz = MAX(hifz, ?3)`
+  ).bind(id, words || 0, hifz || 0, s, o).run();
+}
+
+async function statsText(env) {
+  const one = (sql) => env.DB.prepare(sql).first('n');
+  const [all, today, week, actToday, actWeek, app, words, hifz, rem] = await Promise.all([
+    one('SELECT COUNT(*) n FROM users'),
+    one("SELECT COUNT(*) n FROM users WHERE first_seen >= date('now')"),
+    one("SELECT COUNT(*) n FROM users WHERE first_seen >= date('now','-6 days')"),
+    one("SELECT COUNT(*) n FROM users WHERE last_seen >= date('now')"),
+    one("SELECT COUNT(*) n FROM users WHERE last_seen >= date('now','-6 days')"),
+    one('SELECT COUNT(*) n FROM users WHERE opens > 0'),
+    one('SELECT COUNT(*) n FROM users WHERE words > 0'),
+    one('SELECT COUNT(*) n FROM users WHERE hifz > 0'),
+    one('SELECT COUNT(*) n FROM reminders WHERE enabled = 1'),
+  ]);
+  return '📊 Статистика «Калимы»\n\n' +
+    `Всего пользователей: ${all}\n` +
+    `Новых сегодня: ${today}, за 7 дней: ${week}\n` +
+    `Заходили сегодня: ${actToday}, за 7 дней: ${actWeek}\n\n` +
+    `Открывали приложение: ${app}\n` +
+    `Учат слова: ${words}\n` +
+    `Учат хифз: ${hifz}\n` +
+    `Включили напоминания: ${rem}\n\n` +
+    'Время по UTC (Москва на 3 часа больше).';
+}
+
 function reminderText(goal, learned) {
   return 'Ассаляму алейкум! Время хифза 🌿\n\n' +
     `Сегодня по плану ${goal} ${plural(goal, 'аят', 'аята', 'аятов')}.` +
@@ -74,6 +108,18 @@ export default {
 
   async fetch(req, env) {
     const url = new URL(req.url);
+
+    if (url.pathname === '/api/seen') {
+      const origin = req.headers.get('Origin') || '';
+      const cors = { 'Access-Control-Allow-Origin': ORIGINS.includes(origin) ? origin : ORIGINS[0], 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type', 'content-type': 'application/json' };
+      if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+      if (req.method !== 'POST') return new Response('{}', { status: 405, headers: cors });
+      const body = await req.json().catch(() => ({}));
+      const user = await checkInitData(body.initData, env.BOT_TOKEN);
+      if (!user || !user.id) return new Response('{"ok":false}', { status: 401, headers: cors });
+      await touch(env, user.id, 'open', Math.max(0, Math.min(5000, Number(body.words) || 0)), Math.max(0, Math.min(6236, Number(body.hifz) || 0)));
+      return new Response('{"ok":true}', { headers: cors });
+    }
 
     if (url.pathname === '/api/remind') {
       const origin = req.headers.get('Origin') || '';
@@ -131,7 +177,18 @@ export default {
       const update = await req.json().catch(() => null);
       const msg = update && update.message;
       if (msg && msg.chat) {
-        const isStart = typeof msg.text === 'string' && msg.text.startsWith('/start');
+        const text = typeof msg.text === 'string' ? msg.text.trim() : '';
+        const isStart = text.startsWith('/start');
+        const uid = msg.from && msg.from.id;
+        if (uid && msg.chat.type === 'private') await touch(env, uid, isStart ? 'start' : 'msg', 0, 0).catch(() => {});
+        if (text.startsWith('/stats')) {
+          // Статистику видит только автор. Автор подключается один раз: /stats КОД (код хранится секретом STATS_CODE).
+          const code = text.split(/\s+/)[1];
+          if (code && env.STATS_CODE && code === env.STATS_CODE && uid) await env.DB.prepare('INSERT OR IGNORE INTO admins (user_id) VALUES (?1)').bind(uid).run();
+          const isAdmin = uid && (await env.DB.prepare('SELECT 1 n FROM admins WHERE user_id = ?1').bind(uid).first('n'));
+          await api('sendMessage', { chat_id: msg.chat.id, text: isAdmin ? await statsText(env) : 'Эта команда только для автора бота.' });
+          return new Response('ok');
+        }
         await api('sendMessage', {
           chat_id: msg.chat.id,
           text: isStart ? HELLO : 'Чтобы заниматься, нажми на кнопку ниже.',
