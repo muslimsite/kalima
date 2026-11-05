@@ -429,7 +429,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=7`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=8`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -594,9 +594,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=7').then((r) => r.json()),
-      fetch('data/coverage.json?v=7').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=7').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=8').then((r) => r.json()),
+      fetch('data/coverage.json?v=8').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=8').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
