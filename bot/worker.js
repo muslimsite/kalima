@@ -225,6 +225,39 @@ export default {
           await api('sendMessage', { chat_id: msg.chat.id, text: isAdmin ? await statsText(env) : 'Эта команда только для автора бота.' });
           return new Response('ok');
         }
+        // Переписка с автором: сообщения людей приходят автору, ответ автора уходит человеку.
+        if (uid && msg.chat.type === 'private' && !isStart) {
+          const mine = await env.DB.prepare('SELECT 1 n FROM admins WHERE user_id = ?1').bind(uid).first('n');
+          if (mine) {
+            const orig = msg.reply_to_message;
+            const row = orig && await env.DB.prepare('SELECT user_id FROM feedback WHERE admin_id = ?1 AND admin_msg_id = ?2').bind(uid, orig.message_id).first();
+            if (!row) {
+              await api('sendMessage', { chat_id: msg.chat.id, text: orig ? 'Не нашла, кому это отправить. Ответьте именно на сообщение человека или на подпись над ним.' : 'Чтобы ответить человеку, нажмите на его сообщение и выберите «Ответить».' });
+              return new Response('ok');
+            }
+            const sent = text
+              ? await api('sendMessage', { chat_id: row.user_id, text: 'Ответ от Медины:\n\n' + msg.text })
+              : await api('copyMessage', { chat_id: row.user_id, from_chat_id: msg.chat.id, message_id: msg.message_id });
+            await api('sendMessage', { chat_id: msg.chat.id, reply_to_message_id: msg.message_id, text: sent.ok ? 'Отправлено.' : sent.error_code === 403 ? 'Не доставлено: человек остановил бота.' : 'Не получилось отправить, попробуйте ещё раз.' });
+            return new Response('ok');
+          }
+          if (!text.startsWith('/')) {
+            const { results: admins } = await env.DB.prepare('SELECT user_id FROM admins').all();
+            let delivered = false;
+            const who = [[msg.from.first_name, msg.from.last_name].filter(Boolean).join(' '), msg.from.username ? '@' + msg.from.username : ''].filter(Boolean).join(', ');
+            for (const a of admins || []) {
+              const head = await api('sendMessage', { chat_id: a.user_id, text: `Сообщение от: ${who || 'без имени'}\nЧтобы ответить, нажмите «Ответить» на этом сообщении или на следующем.` });
+              const copy = await api('copyMessage', { chat_id: a.user_id, from_chat_id: msg.chat.id, message_id: msg.message_id });
+              for (const r of [head, copy]) {
+                const id = r.ok && r.result.message_id;
+                if (id) await env.DB.prepare("INSERT OR REPLACE INTO feedback (admin_id, admin_msg_id, user_id, created) VALUES (?1, ?2, ?3, datetime('now'))").bind(a.user_id, id, uid).run();
+              }
+              if (copy.ok) delivered = true;
+            }
+            await api('sendMessage', { chat_id: msg.chat.id, text: delivered ? 'Сообщение получено, Медина его прочитает. Ответ придёт сюда, в этот чат.' : 'Сейчас не получилось передать сообщение, попробуйте позже.', reply_markup: openBtn });
+            return new Response('ok');
+          }
+        }
         await api('sendMessage', {
           chat_id: msg.chat.id,
           text: isStart ? HELLO : 'Чтобы заниматься, нажми на кнопку ниже.',

@@ -21,3 +21,12 @@ CREATE TABLE IF NOT EXISTS users (
 );
 -- Кто видит /stats (автор подключается командой /stats КОД)
 CREATE TABLE IF NOT EXISTS admins (user_id INTEGER PRIMARY KEY);
+
+-- Сообщения автору: какой пересланный автору пост от какого человека, чтобы ответ ушёл ему. Текст не хранится.
+CREATE TABLE IF NOT EXISTS feedback (
+  admin_id INTEGER NOT NULL,
+  admin_msg_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  created TEXT NOT NULL,
+  PRIMARY KEY (admin_id, admin_msg_id)
+);
