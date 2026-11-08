@@ -130,7 +130,7 @@ async function openTafsir(n, a) {
 const BOT = 'Koran_slovo_bot';
 const BOT_URL = 'https://t.me/' + BOT;
 const hzCache = {};
-const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=14`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
+const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=15`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
 let qrLib = null;
 function loadQr() {
   if (window.qrcode) return Promise.resolve(window.qrcode);
@@ -437,8 +437,8 @@ function welcome() {
   $where.textContent = '';
   $view.innerHTML = `<div class="narrow welcome">
     <p class="ayah" lang="ar">ٱلسَّلَامُ عَلَيْكُمْ</p>
-    <h1>Ассаляму алейкум, сестра!</h1>
-    <p class="lead">Рада видеть тебя в тренажёре. Занимайся, учи слова Корана и получай свою награду.</p>
+    <h1>Ассаляму алейкум!</h1>
+    <p class="lead">Добро пожаловать в тренажёр. Занимайся, учи слова Корана и получай свою награду.</p>
     <button class="btn" data-act="hello">Начать</button>
   </div>`;
 }
@@ -722,7 +722,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=14`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=15`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -754,7 +754,7 @@ function drawHifz() {
       <button class="btn ghost" data-act="hhide">${hide ? 'Показать текст' : 'Спрятать текст'}</button>
       <button class="btn ghost" data-act="hlink" ${i ? '' : 'disabled'}>Связать с прошлыми</button>
     </div>
-    <button class="btn ${isDone ? 'ghost' : 'okb'}" data-act="hdone">${isDone ? 'Аят выучен, снять отметку' : 'Выучила этот аят'}</button>
+    <button class="btn ${isDone ? 'ghost' : 'okb'}" data-act="hdone">${isDone ? 'Аят выучен, снять отметку' : 'Аят выучен'}</button>
     <div class="row2">
       <button class="btn ghost" data-act="hstep" data-d="-1" ${i ? '' : 'disabled'}>Предыдущий</button>
       <button class="btn ghost" data-act="hstep" data-d="1" ${i < total - 1 ? '' : 'disabled'}>Следующий</button>
@@ -987,9 +987,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=14').then((r) => r.json()),
-      fetch('data/coverage.json?v=14').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=14').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=15').then((r) => r.json()),
+      fetch('data/coverage.json?v=15').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=15').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
@@ -1005,6 +1005,6 @@ document.addEventListener('click', (e) => {
   go(!S.hi ? 'welcome' : location.hash === '#hifz' ? 'hifzToc' : 'home');
   const remote = await loadCloud();
   if (remote && (!local || remote.t > local.t)) { apply(remote); if (screen === 'home' || (screen === 'welcome' && S.hi)) go('home'); }
-  // Счётчик для автора: бот отмечает, что сестра открыла приложение (только номер аккаунта и сколько выучено).
+  // Счётчик для автора: бот отмечает, что человек открыл приложение (только номер аккаунта и сколько выучено).
   if (tg && tg.initData) fetch(API.replace('/remind', '/seen'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ initData: tg.initData, words: Object.keys(P).length, hifz: hifzDone() }) }).catch(() => {});
 })();
