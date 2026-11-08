@@ -2,11 +2,15 @@
    nurtech-check-disable latin-only-font: Amiri только для арабского текста (lang="ar"), русский набран Commissioner и Sofia Sans Condensed */
 :root {
   --bg: #0F1415; --raise: #161D1E; --lamp: #2A2620; --ink: #EDEBE7; --muted: #9AA3A1; --line: #273032;
-  --accent: #D39A68; --accent-ink: #1A1410; --ok: #7FB89A; --bad: #E08378;
+  --accent: #D39A68; --accent-ink: #1A1410; --ok: #7FB89A; --ok-ink: #0E1A14; --bad: #E08378; --scheme: dark;
   --f-head: "Sofia Sans Condensed", sans-serif; --f-text: "Commissioner", sans-serif; --f-ar: "Amiri", serif;
   --s1: .875rem; --s2: 1.0625rem; --s3: 1.5rem; --s4: clamp(2.6rem, 1.6rem + 4.4vw, 4.8rem);
   --word: clamp(4.5rem, 3rem + 10vw, 7.5rem);
 }
+/* Фоны на выбор (экран «Фон и чтец»). «Ночь» — основной, токены выше. */
+:root[data-theme="emerald"] { --bg: #0D1A15; --raise: #13241D; --lamp: #26302A; --ink: #ECF1ED; --muted: #9BAEA5; --line: #22362D; --accent: #D7A06E; --ok: #86C3A1; }
+:root[data-theme="sea"] { --bg: #0C1620; --raise: #122130; --lamp: #262B2E; --ink: #E8EDF1; --muted: #97A6B2; --line: #213242; }
+:root[data-theme="day"] { --bg: #EEF1EE; --raise: #FFFFFF; --lamp: #F6F4EE; --ink: #18201E; --muted: #56625E; --line: #D5DCD8; --accent: #9E5422; --accent-ink: #FFFFFF; --ok: #2B7A53; --ok-ink: #FFFFFF; --bad: #B23F35; --scheme: light; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
 html { -webkit-text-size-adjust: 100%; }
 img, video { max-width: 100%; height: auto; display: block; }
@@ -90,7 +94,7 @@ p { text-wrap: pretty; }
 .welcome .ayah { color: var(--ok); font-weight: 700; font-size: clamp(2.4rem, 1.8rem + 3vw, 3.4rem); }
 .welcome h1 { color: var(--ok); }
 .welcome .lead { margin-top: 0; }
-.welcome .btn { max-width: 420px; background: var(--ok); color: #0E1A14; }
+.welcome .btn { max-width: 420px; background: var(--ok); color: var(--ok-ink); }
 
 /* Звук */
 .sound { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
@@ -110,7 +114,7 @@ p { text-wrap: pretty; }
 .seg button { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: none; font: 600 var(--s2)/1 var(--f-head); }
 .seg .on { border-color: var(--accent); color: var(--accent); }
 .btn svg { width: 20px; height: 20px; }
-.btn.okb { background: var(--ok); color: #0E1A14; }
+.btn.okb { background: var(--ok); color: var(--ok-ink); }
 .qari { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .qari button { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: none; font: 500 var(--s1)/1.2 var(--f-text); padding: 6px 10px; }
 .qari .on { border-color: var(--accent); color: var(--accent); }
@@ -133,16 +137,35 @@ p { text-wrap: pretty; }
 .plan b { font-size: 1.15rem; }
 .remind { display: grid; gap: 10px; }
 .time { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.time input { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 600 1.25rem/1 var(--f-text); padding: 0 12px; color-scheme: dark; }
+.time input { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 600 1.25rem/1 var(--f-text); padding: 0 12px; color-scheme: var(--scheme); }
 
 /* Главный экран: два больших выбора */
 .choices { display: grid; gap: 12px; }
 .choice { position: relative; overflow: hidden; display: grid; gap: 6px; text-align: left; padding: 76px 20px 20px; min-height: 200px; align-content: end; border: 0; border-radius: 24px; }
 .c-words { background: var(--accent); color: var(--accent-ink); }
-.c-hifz { background: var(--ok); color: #0E1A14; }
+.c-hifz { background: var(--ok); color: var(--ok-ink); }
 .choice .c-ar { position: absolute; top: -2px; right: 18px; font: 700 3.6rem/1.4 var(--f-ar); opacity: .3; }
 .choice .c-title { font: 800 clamp(1.9rem, 1.5rem + 1.6vw, 2.4rem)/1 var(--f-head); letter-spacing: -.01em; }
 .choice .c-desc { font-size: var(--s2); }
 .choice .c-stat { font-size: var(--s1); font-weight: 600; margin-top: 4px; opacity: .8; }
 .choice:active { filter: brightness(.94); }
 @media (min-width: 900px) { .choices { grid-template-columns: 1fr 1fr; } }
+
+/* Фон и чтец */
+.themes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.theme { display: grid; gap: 10px; padding: 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--raise); text-align: left; font: 600 var(--s2)/1.1 var(--f-text); }
+.theme.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.theme .sw { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 12px; border-radius: 10px; font: 700 1.5rem/1 var(--f-ar); }
+.theme .sw i { width: 16px; height: 16px; border-radius: 50%; }
+.list .on b { color: var(--accent); }
+.list .pick { color: var(--accent); }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* Тафсир в нижнем окне */
+.sheet.long { max-height: 88svh; overflow-y: auto; text-align: left; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tabs button { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: none; font: 500 var(--s1)/1.2 var(--f-text); padding: 6px 4px; white-space: nowrap; }
+.tabs .on { border-color: var(--accent); color: var(--accent); }
+.tafsir { display: grid; gap: 10px; max-width: 65ch; }
+.tafsir p { line-height: 1.6; }
+.sheet h3 { font: 800 var(--s3)/1.05 var(--f-head); }
