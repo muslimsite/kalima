@@ -130,7 +130,7 @@ async function openTafsir(n, a) {
 const BOT = 'Koran_slovo_bot';
 const BOT_URL = 'https://t.me/' + BOT;
 const hzCache = {};
-const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=15`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
+const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=16`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
 let qrLib = null;
 function loadQr() {
   if (window.qrcode) return Promise.resolve(window.qrcode);
@@ -348,6 +348,29 @@ function unpack(str) {
   String(str || '').split('|').forEach((r) => { const [id, b, d] = r.split(','); if (id && D.words[id]) out[id] = [+b, +d]; });
   return out;
 }
+/* Лимит CloudStorage 4096 знаков на ключ: выученные аяты храним диапазонами («1-7,9»), иначе несколько длинных сур не влезут */
+function packAyahs(h) {
+  const out = {};
+  Object.entries(h || {}).forEach(([n, list]) => {
+    const parts = [];
+    [...list].sort((x, y) => x - y).forEach((a) => {
+      const l = parts[parts.length - 1];
+      if (l && a === l[1] + 1) l[1] = a; else parts.push([a, a]);
+    });
+    if (parts.length) out[n] = parts.map(([x, y]) => (x === y ? x : x + '-' + y)).join(',');
+  });
+  return out;
+}
+function unpackAyahs(h) {
+  const out = {};
+  Object.entries(h || {}).forEach(([n, v]) => {
+    if (Array.isArray(v)) { out[n] = v; return; } // старый формат
+    const list = [];
+    String(v).split(',').forEach((p) => { const [x, y] = p.split('-').map(Number); if (x) for (let a = x; a <= (y || x); a++) list.push(a); });
+    out[n] = list;
+  });
+  return out;
+}
 function cloud() { return tg && tg.CloudStorage && tg.isVersionAtLeast && tg.isVersionAtLeast('6.9') ? tg.CloudStorage : null; }
 function save() {
   const t = Date.now();
@@ -359,7 +382,7 @@ function save() {
   chunks.forEach((c, i) => cs.setItem('p' + i, c));
   const { h, hd, ...rest } = S;
   cs.setItem('meta', JSON.stringify({ t, n: chunks.length, s: rest }));
-  cs.setItem('hz', JSON.stringify(h || {}));
+  cs.setItem('hz', JSON.stringify(packAyahs(h)));
   cs.setItem('hd', JSON.stringify(hd || {}));
 }
 function loadLocal() {
@@ -379,7 +402,7 @@ function loadCloud() {
         clearTimeout(timer);
         if (e2 || !vals) return res(null);
         let h = {}, hd = {};
-        try { h = JSON.parse(vals.hz || '{}'); hd = JSON.parse(vals.hd || '{}'); } catch (e) {}
+        try { h = unpackAyahs(JSON.parse(vals.hz || '{}')); hd = JSON.parse(vals.hd || '{}'); } catch (e) {}
         res({ t: m.t, s: { ...m.s, h, hd }, p: keys.map((k) => vals[k] || '').join('') });
       });
     });
@@ -427,7 +450,7 @@ function go(name, arg) {
   back = null;
   closeSheet();
   window.scrollTo(0, 0);
-  ({ home, words, lesson, toc, sura, welcome, hifzToc, hifz, settings, quran, read })[name](arg);
+  ({ home, words, lesson, toc, sura, welcome, hifzToc, hifz, hifzKnown, settings, quran, read })[name](arg);
   if (tg && tg.BackButton) name === 'home' || name === 'welcome' ? tg.BackButton.hide() : tg.BackButton.show();
 }
 function goBack() { if (!$sheet.hidden) return closeSheet(); if (back) { const b = back; back = null; return b(); } go('home'); }
@@ -628,19 +651,106 @@ function drawResult() {
 /* ---------- хифз ---------- */
 const learnedAyahs = (n) => S.h[n] || [];
 function hifzDone() { return Object.values(S.h).reduce((a, x) => a + x.length, 0); }
+const hifzOrder = () => [...SIDX].sort((a, b) => (a.n === 1 ? -1 : b.n === 1 ? 1 : b.n - a.n));
+const suraFull = (x) => learnedAyahs(x.n).length >= x.ayahs;
+// Следующая сура: сначала начатая, потом первая невыученная по порядку хифза
+function nextSura() {
+  const l = hifzOrder();
+  return l.find((x) => learnedAyahs(x.n).length && !suraFull(x)) || l.find((x) => !suraFull(x)) || null;
+}
+function hzRow(x) {
+  const k = learnedAyahs(x.n).length;
+  return `<button data-go="hifz" data-n="${x.n}"><span>${x.n}. ${esc(x.title)}<span class="sub">Джуз ${x.juz}, ${k ? `выучено ${k} из ${x.ayahs}` : `${x.ayahs} ${plural(x.ayahs, 'аят', 'аята', 'аятов')}`}</span></span><b>${Math.round((k / x.ayahs) * 100)}%</b></button>`;
+}
+function nextLabel(x) {
+  const k = learnedAyahs(x.n).length;
+  if (k) return `Продолжить: «${esc(x.title)}», выучено ${k} из ${x.ayahs}`;
+  return `${hifzDone() ? 'Следующая сура' : 'Начать'}: «${esc(x.title)}»`;
+}
 function hifzToc() {
   $where.textContent = 'Хифз';
-  const list = [...SIDX].sort((a, b) => (a.n === 1 ? -1 : b.n === 1 ? 1 : b.n - a.n));
+  hzUndo = null;
+  const order = hifzOrder(), todo = order.filter((x) => !suraFull(x)), full = order.filter(suraFull), nx = nextSura();
   $view.innerHTML = `<div class="narrow stack">
     <h2>Учите суры наизусть, аят за аятом</h2>
+    ${nx ? `<button class="btn" data-go="hifz" data-n="${nx.n}">${nextLabel(nx)}</button>` : ''}
+    <button class="btn ghost" data-go="hifzKnown">Отметить суры, которые уже знаю</button>
     ${tracker()}
     ${reminderBox()}
     <p class="muted">Слушайте аят несколько раз, повторяйте за чтецом, потом спрячьте текст и проверьте себя.</p>
-    <div class="list">${list.map((x) => {
-      const k = learnedAyahs(x.n).length;
-      return `<button data-go="hifz" data-n="${x.n}"><span>${x.n}. ${esc(x.title)}<span class="sub">Джуз ${x.juz}, ${k ? `выучено ${k} из ${x.ayahs}` : `${x.ayahs} ${plural(x.ayahs, 'аят', 'аята', 'аятов')}`}</span></span><b>${Math.round((k / x.ayahs) * 100)}%</b></button>`;
-    }).join('')}</div>
+    <div class="list">${todo.map(hzRow).join('')}</div>
+    ${full.length ? `<p class="muted">Выученные суры: ${full.length}</p><div class="list">${full.map(hzRow).join('')}</div>` : ''}
   </div>`;
+}
+
+/* ---------- отметка «уже знаю наизусть» ---------- */
+// Начало каждого джуза [сура, аят], посчитано по data/hifz
+const JUZ_START = [[1,1],[2,142],[2,253],[3,93],[4,24],[4,148],[5,82],[6,111],[7,88],[8,41],[9,93],[11,6],[12,53],[15,1],[17,1],[18,75],[21,1],[23,1],[25,21],[27,56],[29,46],[33,31],[36,28],[39,32],[41,47],[46,1],[51,31],[58,1],[67,1],[78,1]];
+const TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+const suraLen = (n) => (SIDX.find((x) => x.n === n) || { ayahs: 0 }).ayahs;
+function juzParts(j) {
+  const [sn, sa] = JUZ_START[j - 1], e = JUZ_START[j] || [115, 1], out = [];
+  for (let n = sn; n <= Math.min(e[0], 114); n++) {
+    const from = n === sn ? sa : 1, to = n === e[0] ? e[1] - 1 : suraLen(n);
+    if (to >= from) out.push([n, from, to]);
+  }
+  return out;
+}
+const inPart = (a, f, t) => a >= f && a <= t;
+const partsFull = (parts) => parts.every(([n, f, t]) => learnedAyahs(n).filter((a) => inPart(a, f, t)).length === t - f + 1);
+let KN = null, knTimer = 0;
+// Снятие отметки возвращает то, что было выучено по аятам до открытия экрана
+function setParts(parts, on) {
+  parts.forEach(([n, f, t]) => {
+    const rest = learnedAyahs(n).filter((a) => !inPart(a, f, t)), len = t - f + 1;
+    let mid = [];
+    if (on) mid = Array.from({ length: len }, (_, i) => f + i);
+    else { const o = (KN.orig[n] || []).filter((a) => inPart(a, f, t)); if (o.length < len) mid = o; }
+    const list = [...rest, ...mid].sort((x, y) => x - y);
+    if (list.length) S.h[n] = list; else delete S.h[n];
+  });
+  save();
+  clearTimeout(knTimer); knTimer = setTimeout(syncProgress, 800);
+}
+function drawKnown() {
+  const q = KN.q;
+  document.getElementById('knJuz').innerHTML = JUZ_START.map((_, i) => {
+    const on = partsFull(juzParts(i + 1));
+    return `<button data-act="kjuz" data-j="${i + 1}" class="${on ? 'on' : ''}" aria-pressed="${on}" aria-label="Джуз ${i + 1}">${i + 1}</button>`;
+  }).join('');
+  document.getElementById('knList').innerHTML = hifzOrder().filter((x) => !q || (x.n + ' ' + x.title).toLowerCase().includes(q)).map((x) => {
+    const k = learnedAyahs(x.n).length, on = k >= x.ayahs;
+    return `<button data-act="ksura" data-n="${x.n}" class="${on ? 'on' : ''}" aria-pressed="${on}"><span>${x.n}. ${esc(x.title)}<span class="sub">${k && !on ? `выучено ${k} из ${x.ayahs}` : `${x.ayahs} ${plural(x.ayahs, 'аят', 'аята', 'аятов')}`}</span></span><span class="tick">${on ? TICK : ''}</span></button>`;
+  }).join('') || '<p class="muted">Такой суры не нашлось.</p>';
+  const c = SIDX.filter(suraFull).length;
+  document.getElementById('knDone').textContent = c ? `Готово, сур выучено: ${c}` : 'Готово';
+}
+function hifzKnown() {
+  $where.textContent = 'Уже знаю';
+  KN = { orig: JSON.parse(JSON.stringify(S.h)), q: '' };
+  back = () => go('hifzToc');
+  $view.innerHTML = `<div class="narrow stack">
+    <h2>Отметьте, что уже знаете наизусть</h2>
+    <p class="muted">Отмеченное засчитается как выученное, и приложение предложит следующую суру.</p>
+    <p class="muted">Целые джузы: 30-й это «Амма», 29-й это «Табарак».</p>
+    <div class="seg juz" id="knJuz" role="group" aria-label="Джузы"></div>
+    <p class="muted">Или отдельные суры:</p>
+    <input class="find" id="knFind" type="search" placeholder="Найти суру: название или номер" aria-label="Найти суру">
+    <div class="list" id="knList"></div>
+    <button class="btn stick" id="knDone" data-go="hifzToc">Готово</button>
+  </div>`;
+  document.getElementById('knFind').addEventListener('input', (e) => { KN.q = e.target.value.trim().toLowerCase(); drawKnown(); });
+  drawKnown();
+}
+function knownAct(a, t) {
+  haptic();
+  if (a === 'kjuz') { const p = juzParts(+t.dataset.j); setParts(p, !partsFull(p)); }
+  else { const n = +t.dataset.n, p = [[n, 1, suraLen(n)]]; setParts(p, !partsFull(p)); }
+  drawKnown();
+}
+function ask(text, cb) {
+  if (tg && tg.showConfirm && tg.isVersionAtLeast && tg.isVersionAtLeast('6.2')) tg.showConfirm(text, (ok) => { if (ok) cb(); });
+  else if (window.confirm(text)) cb();
 }
 const QURAN_AYAHS = 6236;
 const CROWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>';
@@ -654,7 +764,9 @@ function streak() {
 }
 function tracker() {
   const learned = hifzDone();
-  const amma = SIDX.filter((x) => x.n === 1 || x.n >= 78).reduce((a, x) => a + x.ayahs, 0) || 571;
+  const ammaSet = SIDX.filter((x) => x.n === 1 || x.n >= 78);
+  const amma = ammaSet.reduce((a, x) => a + x.ayahs, 0) || 571;
+  const ammaKnown = ammaSet.reduce((a, x) => a + learnedAyahs(x.n).length, 0);
   const t = S.hd[today()] || 0, g = S.goal;
   const pct = (x) => Math.min(100, (x / QURAN_AYAHS) * 100);
   const stops = [[7, 'Аль-Фатиха'], [amma, 'Аль-Фатиха и джуз «Амма»'], [QURAN_AYAHS / 2, 'Половина Корана']];
@@ -673,7 +785,7 @@ function tracker() {
     </div>
     <div class="road-labels"><span>Выучено ${learned} ${plural(learned, 'аят', 'аята', 'аятов')}</span><span>Весь Коран</span></div>
     <div class="list plan">
-      <div><span>Аль-Фатиха и джуз «Амма»<span class="sub">${amma} ${plural(amma, 'аят', 'аята', 'аятов')}</span></span><b>${learned >= amma ? 'выучено' : 'к ' + dateRu(left(amma))}</b></div>
+      <div><span>Аль-Фатиха и джуз «Амма»<span class="sub">${amma} ${plural(amma, 'аят', 'аята', 'аятов')}</span></span><b>${ammaKnown >= amma ? 'выучено' : 'к ' + dateRu(Math.ceil((amma - ammaKnown) / g))}</b></div>
       <div><span>Весь Коран<span class="sub">${QURAN_AYAHS} аятов, по ${g} в день</span></span><b>к ${dateRu(left(QURAN_AYAHS))}</b></div>
     </div>
   </section>`;
@@ -715,14 +827,14 @@ async function remAct(a) {
   try { await sendRem(a === 'hremtest' ? { test: true } : {}); haptic('ok'); hifzToc(); if (a === 'hremtest') msg('Пробное напоминание отправлено, загляните в чат с ботом.'); }
   catch (e) { hifzToc(); msg('Не получилось связаться с ботом. Проверьте интернет и попробуйте ещё раз.'); }
 }
-let HZ = null;
+let HZ = null, hzUndo = null;
 async function hifz(arg) {
   const n = +((arg && arg.n) || (HZ && HZ.n));
   if (!HZ || HZ.n !== n) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=15`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=16`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -733,7 +845,7 @@ async function hifz(arg) {
 }
 function drawHifz() {
   const { data, i, hide, open } = HZ, a = data.ayahs[i], total = data.ayahs.length;
-  const done = learnedAyahs(HZ.n), isDone = done.includes(a.n);
+  const done = learnedAyahs(HZ.n), isDone = done.includes(a.n), full = done.length >= total, nx = full ? nextSura() : null;
   $where.textContent = data.title;
   const words = a.w.map((x, j) => {
     const cls = hide && !open.has(j) ? 'hid' : '';
@@ -743,7 +855,8 @@ function drawHifz() {
     <h2>${esc(data.title)}</h2>
     <p class="muted">Аят ${a.n} из ${total}, выучено ${done.length}</p>
     ${bar(done.length, total)}
-    ${i === 0 ? `<div class="sound"><button class="snd" data-act="hopen">${ICON}${HZ.n === 1 || HZ.n === 9 ? 'Истиаза перед сурой' : 'Истиаза и Бисмилля перед сурой'}</button></div>` : ''}
+    ${hzUndo && hzUndo.to === HZ.n ? `<div class="undo"><span>Сура «${esc(hzUndo.title)}» отмечена как выученная</span><button data-act="hundo">Отменить</button></div>` : ''}
+    <div class="sound">${i === 0 ? `<button class="snd" data-act="hopen">${ICON}${HZ.n === 1 || HZ.n === 9 ? 'Истиаза перед сурой' : 'Истиаза и Бисмилля перед сурой'}</button>` : ''}${full ? '' : `<button class="snd" data-act="hknow">${TICK}Уже знаю эту суру</button>`}</div>
     <div class="page hz"><div class="chips" lang="ar">${words}</div>
       <p class="note" style="margin-top:14px">${hide ? 'Вспомните аят. Коснитесь слова, чтобы открыть и послушать его.' : esc(a.ru)}</p>
       ${hide ? '' : `<div class="tools" style="margin-top:12px">${tfBtn(HZ.n, a.n)}${picBtn(HZ.n, a.n)}</div>`}</div>
@@ -754,17 +867,39 @@ function drawHifz() {
       <button class="btn ghost" data-act="hhide">${hide ? 'Показать текст' : 'Спрятать текст'}</button>
       <button class="btn ghost" data-act="hlink" ${i ? '' : 'disabled'}>Связать с прошлыми</button>
     </div>
+    ${nx ? `<button class="btn" data-go="hifz" data-n="${nx.n}">${nextLabel(nx)}</button>` : ''}
     <button class="btn ${isDone ? 'ghost' : 'okb'}" data-act="hdone">${isDone ? 'Аят выучен, снять отметку' : 'Аят выучен'}</button>
     <div class="row2">
       <button class="btn ghost" data-act="hstep" data-d="-1" ${i ? '' : 'disabled'}>Предыдущий</button>
       <button class="btn ghost" data-act="hstep" data-d="1" ${i < total - 1 ? '' : 'disabled'}>Следующий</button>
     </div>
+    ${full ? '<button class="btn ghost" data-act="hunknow">Снять отметку со всей суры</button>' : ''}
   </div>`;
 }
 function hifzAct(a, t) {
   if (a === 'hgoal') { S.goal = +t.dataset.g; save(); syncProgress(); return hifzToc(); }
   if (a === 'hrem' || a === 'hremoff' || a === 'hremtest') return remAct(a);
   const ay = HZ.data.ayahs[HZ.i];
+  if (a === 'hknow') {
+    const n = HZ.n, prev = [...learnedAyahs(n)], title = HZ.data.title;
+    player.pause();
+    S.h[n] = HZ.data.ayahs.map((x) => x.n); save(); haptic('ok');
+    setTimeout(syncProgress, 0);
+    const nx = nextSura();
+    if (!nx) return go('hifzToc');
+    hzUndo = { n, prev, title, to: nx.n };
+    return go('hifz', { n: nx.n });
+  }
+  if (a === 'hundo') {
+    const u = hzUndo; hzUndo = null;
+    if (u.prev.length) S.h[u.n] = u.prev; else delete S.h[u.n];
+    save(); setTimeout(syncProgress, 0);
+    return go('hifz', { n: u.n });
+  }
+  if (a === 'hunknow') return ask('Снять отметку со всей суры? Прогресс по её аятам обнулится.', () => {
+    delete S.h[HZ.n]; save(); setTimeout(syncProgress, 0);
+    HZ.i = 0; window.scrollTo(0, 0); drawHifz();
+  });
   if (a === 'hopen') return play(opening(HZ.n), t);
   if (a === 'hplay') return play(Array(S.rep).fill(ayahUrl(HZ.n, ay.n, S.qari)), t);
   if (a === 'hqari') { player.pause(); go('settings'); back = () => go('hifz'); return; }
@@ -772,8 +907,9 @@ function hifzAct(a, t) {
   if (a === 'hhide') { HZ.hide = !HZ.hide; HZ.open = new Set(); return drawHifz(); }
   if (a === 'hword') { if (HZ.hide) { HZ.open.add(+t.dataset.j); drawHifz(); } return play(t.dataset.url); }
   if (a === 'hlink') return play(HZ.data.ayahs.slice(0, HZ.i + 1).map((x) => ayahUrl(HZ.n, x.n, S.qari)), t);
-  if (a === 'hstep') { HZ.i = Math.max(0, Math.min(HZ.data.ayahs.length - 1, HZ.i + +t.dataset.d)); HZ.hide = false; HZ.open = new Set(); player.pause(); window.scrollTo(0, 0); return drawHifz(); }
+  if (a === 'hstep') { hzUndo = null; HZ.i = Math.max(0, Math.min(HZ.data.ayahs.length - 1, HZ.i + +t.dataset.d)); HZ.hide = false; HZ.open = new Set(); player.pause(); window.scrollTo(0, 0); return drawHifz(); }
   if (a === 'hdone') {
+    hzUndo = null;
     const list = learnedAyahs(HZ.n).filter((x) => x !== ay.n);
     const added = !learnedAyahs(HZ.n).includes(ay.n);
     if (added) { list.push(ay.n); haptic('ok'); }
@@ -793,7 +929,7 @@ function quran() {
   const last = S.rd && SIDX.find((x) => x.n === S.rd.n);
   $view.innerHTML = `<div class="narrow stack">
     <h2>Читать Коран</h2>
-    <p class="muted">Все 114 сур целиком. Можно читать самой или слушать суру подряд с выбранным чтецом.</p>
+    <p class="muted">Все 114 сур целиком. Суру можно читать или слушать подряд с выбранным чтецом.</p>
     ${last ? `<button class="btn" data-go="read" data-n="${last.n}" data-a="${S.rd.a}">Продолжить: «${esc(last.title)}», аят ${S.rd.a}</button>` : ''}
     <input class="find" id="qFind" type="search" placeholder="Найти суру: название или номер" aria-label="Найти суру">
     <div class="list" id="qList">${SIDX.map((x) => `<button data-go="read" data-n="${x.n}" data-q="${esc((x.n + ' ' + x.title).toLowerCase())}"><span>${x.n}. ${esc(x.title)}<span class="sub">Джуз ${x.juz}, ${x.ayahs} ${plural(x.ayahs, 'аят', 'аята', 'аятов')}</span></span></button>`).join('')}</div>
@@ -958,6 +1094,7 @@ document.addEventListener('click', (e) => {
   if (a0(t) === 'rfs') { S.fs = +t.dataset.f; save(); return drawRead(); }
   const a = t.dataset.act;
   if (a === 'close') { if (e.target === t || t.tagName === 'BUTTON') closeSheet(); return; }
+  if (a === 'kjuz' || a === 'ksura') return knownAct(a, t);
   if (a && a[0] === 'h' && a !== 'hello') return hifzAct(a, t);
   if (a === 'hello') { S.hi = true; save(); haptic('ok'); return go('home'); }
   if (a === 'learn') return go('lesson', 'learn');
@@ -987,9 +1124,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=15').then((r) => r.json()),
-      fetch('data/coverage.json?v=15').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=15').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=16').then((r) => r.json()),
+      fetch('data/coverage.json?v=16').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=16').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';

@@ -188,3 +188,11 @@ p { text-wrap: pretty; }
 .ra { cursor: pointer; border-radius: 8px; transition: background-color .2s ease, color .2s ease; }
 .ra.now { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .rn { color: var(--accent); font-size: .85em; white-space: nowrap; }
+.seg.juz { grid-template-columns: repeat(6, 1fr); }
+.list .tick { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; border: 1.5px solid var(--line); color: var(--accent-ink); }
+.list .on .tick { background: var(--accent); border-color: var(--accent); }
+.list .tick svg { width: 16px; height: 16px; }
+.btn.stick { position: sticky; bottom: calc(12px + env(safe-area-inset-bottom)); }
+.undo { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 16px; border: 1px solid var(--line); border-radius: 12px; font-size: var(--s1); }
+.undo button { flex: none; min-height: 44px; padding: 0 8px; border: 0; background: none; color: var(--accent); font: 600 var(--s1)/1 var(--f-text); }
+.seg.juz .on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
