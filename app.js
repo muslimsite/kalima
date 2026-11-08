@@ -118,12 +118,183 @@ async function openTafsir(n, a) {
     <div class="tabs" role="group" aria-label="Какой тафсир">${TAFSIR.map((x) => `<button data-act="tf" data-k="${x[0]}" data-n="${n}" data-a="${a}" class="${x[0] === key ? 'on' : ''}">${x[1]}</button>`).join('')}</div>
     <p class="note">${esc(tf[3])}</p>
     <div class="tafsir">${body}</div>
+    <button class="btn" data-act="share" data-n="${n}" data-a="${a}">${PIC}Сделать картинку для статуса</button>
     <button class="btn ghost" data-act="close">Закрыть</button>
   </div></div>`;
   $sheet.innerHTML = frame('<p class="muted">Загружаем тафсир…</p>');
   try { const ed = await tfSura(n); if (!$sheet.hidden) $sheet.innerHTML = frame(tfBody(ed, key, a)); }
   catch (e) { if (!$sheet.hidden) $sheet.innerHTML = frame('<p class="muted">Не получилось загрузить тафсир. Проверьте интернет и попробуйте ещё раз.</p>'); }
 }
+/* ---------- картинка аята для статуса и истории ---------- */
+// Рисуем на canvas 1080×1920 в цветах выбранного фона: аят, смысл, отрывок тафсира и подпись бота с QR-кодом.
+const BOT = 'Koran_slovo_bot';
+const BOT_URL = 'https://t.me/' + BOT;
+const hzCache = {};
+const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=12`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
+let qrLib = null;
+function loadQr() {
+  if (window.qrcode) return Promise.resolve(window.qrcode);
+  return qrLib || (qrLib = new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+    sc.onload = () => res(window.qrcode); sc.onerror = () => { qrLib = null; rej(new Error('qr')); };
+    document.head.appendChild(sc);
+  }));
+}
+function tfPlain(ed, key, a) {
+  // Текст тафсира без разметки, как в окне тафсира
+  const div = document.createElement('div'); div.innerHTML = tfBody(ed, key, a);
+  return [...div.querySelectorAll('p')].filter((p) => !/^Пояснение к аятам/.test(p.textContent)).map((p) => p.textContent).join(' ').replace(/\s+/g, ' ').trim();
+}
+function wrapLines(ctx, text, maxW) {
+  const out = []; let line = '';
+  for (const w of text.split(' ')) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t;
+  }
+  if (line) out.push(line);
+  return out;
+}
+async function drawShare(n, a, withTafsir) {
+  const css = getComputedStyle(document.documentElement);
+  const v = (k) => css.getPropertyValue(k).trim();
+  await Promise.all(['700 64px Amiri', '400 40px Commissioner', '600 40px Commissioner', '800 60px "Sofia Sans Condensed"'].map((f) => document.fonts.load(f).catch(() => {})));
+  const [sd, ed, qr] = await Promise.all([hzSura(n), withTafsir ? tfSura(n) : null, loadQr().catch(() => null)]);
+  const ay = sd.ayahs.find((x) => x.n === a);
+  const W = 1080, H = 1920, PAD = 96, MW = W - PAD * 2;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = v('--bg'); ctx.fillRect(0, 0, W, H);
+  const g = ctx.createRadialGradient(W / 2, 0, 40, W / 2, 0, H * 0.75);
+  g.addColorStop(0, v('--lamp')); g.addColorStop(1, v('--bg'));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  const FOOT = 300; // место под подпись бота
+  ctx.textAlign = 'center'; ctx.direction = 'ltr';
+  ctx.fillStyle = v('--muted'); ctx.font = '600 38px Commissioner';
+  ctx.fillText(`«${suraName(n)}», аят ${a}`, W / 2, 190);
+  // Аят, смысл и тафсир рисуем на отдельном слое, потом ставим его по центру свободного места
+  const main = ctx, layer = document.createElement('canvas'); layer.width = W; layer.height = H;
+  const TOP = 260;
+  let y = TOP;
+  {
+  const ctx = layer.getContext('2d');
+  ctx.textAlign = 'center';
+
+  // Арабский текст: подбираем размер, чтобы аят занял не больше половины высоты
+  const ar = ay.w.join(' ');
+  let size = ar.length < 60 ? 112 : ar.length < 160 ? 96 : 84, lines;
+  for (; size >= 40; size -= 4) {
+    ctx.font = `700 ${size}px Amiri`; ctx.direction = 'rtl';
+    lines = wrapLines(ctx, ar, MW);
+    if (lines.length * size * 1.9 <= (H - FOOT - 260) * (withTafsir ? 0.5 : 0.62)) break;
+  }
+  const arH = lines.length * size * 1.9;
+  if (y + arH > H - FOOT - 160) return null; // аят слишком длинный для одной картинки
+  ctx.fillStyle = v('--ink');
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, y + size * 1.25 + i * size * 1.9));
+  y += arH + 40;
+
+  // Смысл (Кулиев)
+  ctx.direction = 'ltr'; ctx.fillStyle = v('--ink');
+  let rs = 44, rl;
+  for (; rs >= 30; rs -= 2) { ctx.font = `400 ${rs}px Commissioner`; rl = wrapLines(ctx, ay.ru, MW); if (y + rl.length * rs * 1.45 <= H - FOOT - 120) break; }
+  if (y + rl.length * rs * 1.45 > H - FOOT - 60) return null; // смысл не помещается
+  rl.forEach((l, i) => ctx.fillText(l, W / 2, y + rs + i * rs * 1.45));
+  y += rl.length * rs * 1.45 + 50;
+
+  // Отрывок тафсира: сколько поместится, в конце «…»
+  if (withTafsir && ed) {
+    const key = S.tf === 'muntahab' ? 'muntahab' : 'saadi'; // Абу Адель — перевод, на картинку берём тафсир
+    const txt = tfPlain(ed, key, a);
+    const room = H - FOOT - 60 - y - 70;
+    if (txt && room > 120) {
+      ctx.strokeStyle = v('--line'); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(PAD + 200, y); ctx.lineTo(W - PAD - 200, y); ctx.stroke();
+      y += 64;
+      ctx.fillStyle = v('--accent'); ctx.font = '600 32px Commissioner';
+      ctx.fillText('Тафсир ' + TAFSIR.find((x) => x[0] === key)[1].replace('Ас-', 'ас-').replace('Аль-М', '«Аль-М') + (key === 'muntahab' ? '»' : ''), W / 2, y);
+      y += 30;
+      ctx.font = '400 34px Commissioner'; ctx.fillStyle = v('--muted');
+      const lh = 34 * 1.5, max = Math.floor((H - FOOT - 70 - y) / lh);
+      let tl = wrapLines(ctx, txt, MW);
+      if (tl.length > max) { tl = tl.slice(0, Math.max(1, max)); tl[tl.length - 1] = tl[tl.length - 1].replace(/[\s,.;:]*\S*$/, '') + '…'; }
+      tl.forEach((l, i) => ctx.fillText(l, W / 2, y + 34 + i * lh));
+      y += 34 + tl.length * lh;
+    } else if (txt && SH) SH.noTf = true;
+  }
+
+  }
+  const free = H - FOOT - 40 - y;
+  main.drawImage(layer, 0, Math.max(0, free / 2));
+  // Подпись: QR-код и имя бота, чтобы по картинке можно было найти тренажёр
+  const fy = H - FOOT + 40, box = 200;
+  ctx.fillStyle = v('--raise');
+  ctx.beginPath(); ctx.roundRect(PAD, fy, MW, box + 40, 32); ctx.fill();
+  if (qr) {
+    const q = qr(0, 'M'); q.addData(BOT_URL); q.make();
+    const m = q.getModuleCount(), cell = Math.floor((box - 16) / m), qs = cell * m, qx = PAD + 20 + (box - qs) / 2, qy = fy + 20 + (box - qs) / 2;
+    ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.roundRect(PAD + 20, fy + 20, box, box, 16); ctx.fill();
+    ctx.fillStyle = '#111111';
+    for (let r = 0; r < m; r++) for (let k = 0; k < m; k++) if (q.isDark(r, k)) ctx.fillRect(qx + k * cell, qy + r * cell, cell, cell);
+  }
+  const tx = PAD + (qr ? box + 56 : 40);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = v('--accent'); ctx.font = '800 64px "Sofia Sans Condensed"'; ctx.fillText('Калима', tx, fy + 92);
+  ctx.fillStyle = v('--ink'); ctx.font = '400 32px Commissioner'; ctx.fillText('Тренажёр слов Корана', tx, fy + 142);
+  ctx.fillStyle = v('--muted'); ctx.font = '600 34px Commissioner'; ctx.fillText('@' + BOT + ' в Telegram', tx, fy + 192);
+  return c;
+}
+let SH = null;
+async function openShare(n, a, withTafsir = true) {
+  SH = { n, a, withTafsir, data: null, url: null };
+  const frame = (body) => `<div class="sheet-wrap" data-act="close"><div class="sheet long" role="dialog" aria-label="Картинка аята">
+    <h3>Картинка: «${esc(suraName(n))}», аят ${a}</h3>
+    <div class="tabs two" role="group" aria-label="Что на картинке"><button data-act="shmode" data-t="1" class="${withTafsir ? 'on' : ''}">С тафсиром</button><button data-act="shmode" data-t="0" class="${withTafsir ? '' : 'on'}">Только аят</button></div>
+    ${body}
+    <button class="btn ghost" data-act="close">Закрыть</button>
+  </div></div>`;
+  $sheet.hidden = false;
+  $sheet.innerHTML = frame('<p class="muted">Рисуем картинку…</p>');
+  let c = null;
+  try { c = await drawShare(n, a, withTafsir); } catch (e) {}
+  if ($sheet.hidden || !SH || SH.n !== n || SH.a !== a || SH.withTafsir !== withTafsir) return;
+  if (!c) { $sheet.innerHTML = frame('<p class="muted">Этот аят слишком длинный для одной картинки или не загрузился. Попробуйте «Только аят» или другой аят.</p>'); return; }
+  SH.data = c.toDataURL('image/jpeg', 0.9);
+  const noTf = withTafsir && SH.noTf;
+  c.toBlob((b) => { if (SH) SH.blob = b; }, 'image/jpeg', 0.9);
+  const inTg = !!(tg && tg.initData);
+  const story = inTg && tg.shareToStory && tg.isVersionAtLeast && tg.isVersionAtLeast('7.8');
+  $sheet.innerHTML = frame(`${noTf ? '<p class="note">Аят длинный, поэтому тафсир на картинку не поместился. Его можно прочитать в боте по кнопке «Тафсир».</p>' : ''}<img class="shot" src="${SH.data}" alt="Картинка с аятом ${a} суры «${esc(suraName(n))}»${withTafsir ? ' и тафсиром' : ''}">
+    ${inTg ? `<button class="btn" data-act="shsend">Прислать мне в чат</button>` : ''}
+    ${story ? `<button class="btn ghost" data-act="shstory">Выложить в историю Telegram</button>` : ''}
+    <button class="btn ghost" data-act="shsave">${navigator.canShare ? 'Поделиться или сохранить' : 'Сохранить картинку'}</button>
+    <p class="note" id="shMsg">${inTg ? 'Бот пришлёт картинку в чат: оттуда её можно сохранить в галерею и выложить в статус WhatsApp или в историю.' : 'Картинку можно сохранить и выложить в статус.'}</p>`);
+}
+async function shareAct(a, t) {
+  const msg = (x) => { const el = document.getElementById('shMsg'); if (el) el.textContent = x; };
+  if (a === 'shmode') return openShare(SH.n, SH.a, t.dataset.t === '1');
+  if (!SH || !SH.data) return;
+  if (a === 'shsave') {
+    const file = SH.blob && new File([SH.blob], `kalima-${SH.n}-${SH.a}.jpg`, { type: 'image/jpeg' });
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], text: 'Тренажёр слов Корана «Калима»: ' + BOT_URL }); } catch (e) {} return; }
+    if (tg && tg.initData) { msg('Здесь сохранить напрямую не получится. Нажмите «Прислать мне в чат», и бот пришлёт картинку.'); return; }
+    const l = document.createElement('a'); l.href = SH.data; l.download = `kalima-${SH.n}-${SH.a}.jpg`; l.click(); return;
+  }
+  t.disabled = true; msg('Отправляем…');
+  try {
+    if (!SH.url || a === 'shsend') {
+      const r = await fetch(API.replace('/remind', '/share'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ initData: tg.initData, img: SH.data, send: a === 'shsend', title: suraName(SH.n), a: SH.a }) });
+      const j = await r.json(); if (!j.url) throw new Error('share'); SH.url = j.url;
+      if (!j.ok) throw new Error('send');
+    }
+    if (a === 'shsend') { haptic('ok'); msg('Готово! Картинка в чате с ботом. Откройте её и сохраните в галерею.'); }
+    if (a === 'shstory') tg.shareToStory(SH.url, { text: 'Тренажёр слов Корана «Калима»: @' + BOT });
+  } catch (e) { msg('Не получилось отправить. Если вы ещё не писали боту, нажмите в нём «Старт» и попробуйте снова.'); }
+  t.disabled = false;
+}
+const PIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+const picBtn = (n, a) => `<button class="snd" data-act="share" data-n="${n}" data-a="${a}">${PIC}Картинка</button>`;
 const BOOK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>';
 const tfBtn = (n, a) => `<button class="snd" data-act="tafsir" data-n="${n}" data-a="${a}">${BOOK}Тафсир</button>`;
 const player = new Audio();
@@ -520,7 +691,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=11`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=12`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -544,7 +715,7 @@ function drawHifz() {
     ${i === 0 && HZ.n !== 1 && HZ.n !== 9 ? `<div class="sound"><button class="snd" data-act="play" data-url="${esc(ayahUrl(1, 1, S.qari))}">${ICON}Бисмилля перед сурой</button></div>` : ''}
     <div class="page hz"><div class="chips" lang="ar">${words}</div>
       <p class="note" style="margin-top:14px">${hide ? 'Вспомните аят. Коснитесь слова, чтобы открыть и послушать его.' : esc(a.ru)}</p>
-      ${hide ? '' : `<div class="tools" style="margin-top:12px">${tfBtn(HZ.n, a.n)}</div>`}</div>
+      ${hide ? '' : `<div class="tools" style="margin-top:12px">${tfBtn(HZ.n, a.n)}${picBtn(HZ.n, a.n)}</div>`}</div>
     <button class="btn" data-act="hplay">${ICON}Слушать ${S.rep > 1 ? S.rep + ' ' + plural(S.rep, 'раз', 'раза', 'раз') : ''}</button>
     <div class="seg" role="group" aria-label="Сколько раз повторять">${[1, 3, 5, 10].map((r) => `<button data-act="hrep" data-r="${r}" class="${S.rep === r ? 'on' : ''}">×${r}</button>`).join('')}</div>
     <nav class="list"><button data-act="hqari"><span>Чтец<span class="sub">${esc(qariName())}</span></span><b>сменить</b></button></nav>
@@ -676,6 +847,8 @@ document.addEventListener('click', (e) => {
   if (a === 'play') { e.stopPropagation(); return play(t.dataset.url, t); }
   if (a === 'theme') { S.theme = t.dataset.k; save(); applyTheme(); haptic(); return settings(); }
   if (a === 'qari') { S.qari = t.dataset.q; save(); haptic(); const keep = back; settings(); back = keep; return play(ayahUrl(1, 2), $view.querySelector(`[data-q="${t.dataset.q}"]`)); }
+  if (a === 'share') { e.stopPropagation(); haptic(); return openShare(+t.dataset.n, +t.dataset.a); }
+  if (a === 'shmode' || a === 'shsave' || a === 'shsend' || a === 'shstory') return shareAct(a, t);
   if (a === 'tafsir') { e.stopPropagation(); haptic(); return openTafsir(+t.dataset.n, +t.dataset.a); }
   if (a === 'tf') { S.tf = t.dataset.k; save(); return openTafsir(+t.dataset.n, +t.dataset.a); }
   if (a === 'pin') { const id = t.dataset.id; if (!S.pin.includes(id)) S.pin.unshift(id); save(); closeSheet(); return; }
@@ -689,9 +862,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=11').then((r) => r.json()),
-      fetch('data/coverage.json?v=11').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=11').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=12').then((r) => r.json()),
+      fetch('data/coverage.json?v=12').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=12').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';

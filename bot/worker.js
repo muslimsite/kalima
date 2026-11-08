@@ -109,6 +109,43 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
 
+    // Картинка аята: приложение присылает готовый JPEG, бот хранит его 2 дня (для истории Telegram) и шлёт в чат.
+    const img = url.pathname.match(/^\/img\/([a-z0-9]{16})\.jpg$/);
+    if (img && req.method === 'GET') {
+      const buf = await env.IMG.get(img[1], 'arrayBuffer');
+      if (!buf) return new Response('not found', { status: 404 });
+      return new Response(buf, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=172800', 'access-control-allow-origin': '*' } });
+    }
+    if (url.pathname === '/api/share') {
+      const origin = req.headers.get('Origin') || '';
+      const cors = { 'Access-Control-Allow-Origin': ORIGINS.includes(origin) ? origin : ORIGINS[0], 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type', 'content-type': 'application/json' };
+      if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+      if (req.method !== 'POST') return new Response('{}', { status: 405, headers: cors });
+      const body = await req.json().catch(() => ({}));
+      const user = await checkInitData(body.initData, env.BOT_TOKEN);
+      if (!user || !user.id) return new Response('{"ok":false,"error":"auth"}', { status: 401, headers: cors });
+      const b64 = String(body.img || '').replace(/^data:image\/jpeg;base64,/, '');
+      if (!b64 || b64.length > 4_000_000) return new Response('{"ok":false,"error":"size"}', { status: 413, headers: cors });
+      let bytes;
+      try { bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)); } catch (e) { return new Response('{"ok":false}', { status: 400, headers: cors }); }
+      if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return new Response('{"ok":false,"error":"type"}', { status: 400, headers: cors });
+      const id = hex(crypto.getRandomValues(new Uint8Array(8)));
+      await env.IMG.put(id, bytes, { expirationTtl: 172800 });
+      const link = `${url.origin}/img/${id}.jpg`;
+      if (body.send) {
+        const title = String(body.title || '').replace(/[^\p{L}\p{N} «»'’ -]/gu, '').slice(0, 40);
+        const ayah = Math.max(1, Math.min(286, Number(body.a) || 1));
+        const me = await tgApi(env, 'getMe', {});
+        const bot = me.ok ? '@' + me.result.username : '';
+        const res = await tgApi(env, 'sendPhoto', {
+          chat_id: user.id, photo: link,
+          caption: `«${title}», аят ${ayah}\n\nСохрани картинку и выложи в статус или историю.\nТренажёр слов Корана «Калима»: ${bot}`,
+        });
+        if (!res.ok) return new Response(JSON.stringify({ ok: false, error: 'send', url: link }), { status: 502, headers: cors });
+      }
+      return new Response(JSON.stringify({ ok: true, url: link }), { headers: cors });
+    }
+
     if (url.pathname === '/api/seen') {
       const origin = req.headers.get('Origin') || '';
       const cors = { 'Access-Control-Allow-Origin': ORIGINS.includes(origin) ? origin : ORIGINS[0], 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type', 'content-type': 'application/json' };

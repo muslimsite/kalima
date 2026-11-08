@@ -169,3 +169,7 @@ p { text-wrap: pretty; }
 .tafsir { display: grid; gap: 10px; max-width: 65ch; }
 .tafsir p { line-height: 1.6; }
 .sheet h3 { font: 800 var(--s3)/1.05 var(--f-head); }
+
+/* Картинка аята для статуса */
+.tabs.two { grid-template-columns: 1fr 1fr; }
+.shot { width: 100%; max-width: 300px; max-height: 52svh; object-fit: contain; margin: 0 auto; border-radius: 16px; border: 1px solid var(--line); }
