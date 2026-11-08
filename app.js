@@ -130,7 +130,7 @@ async function openTafsir(n, a) {
 const BOT = 'Koran_slovo_bot';
 const BOT_URL = 'https://t.me/' + BOT;
 const hzCache = {};
-const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=12`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
+const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=13`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
 let qrLib = null;
 function loadQr() {
   if (window.qrcode) return Promise.resolve(window.qrcode);
@@ -301,17 +301,37 @@ const player = new Audio();
 player.preload = 'none';
 let playingBtn = null;
 let queue = [];
-function play(src, btn) {
+let onTrack = null, trackIdx = 0; // для чтения суры подряд: какой аят звучит сейчас
+function play(src, btn, cb) {
   const list = Array.isArray(src) ? src : [src];
   if (playingBtn) playingBtn.classList.remove('on');
+  if (onTrack) { const f = onTrack; onTrack = null; f(-1); }
   if (btn && playingBtn === btn && !player.paused) { player.pause(); queue = []; playingBtn = null; return; }
   queue = list.slice(1);
+  onTrack = cb || null; trackIdx = 0; if (onTrack) onTrack(0);
   player.src = list[0];
   playingBtn = btn || null;
   if (btn) btn.classList.add('on');
   player.play().catch(() => { if (btn) { btn.classList.remove('on'); btn.classList.add('err'); } });
 }
-player.addEventListener('ended', () => { if (queue.length) { player.src = queue.shift(); player.play().catch(() => {}); return; } if (playingBtn) playingBtn.classList.remove('on'); playingBtn = null; });
+player.addEventListener('ended', () => {
+  if (queue.length) { player.src = queue.shift(); trackIdx++; if (onTrack) onTrack(trackIdx); player.play().catch(() => {}); return; }
+  if (playingBtn) playingBtn.classList.remove('on'); playingBtn = null;
+  if (onTrack) { const f = onTrack; onTrack = null; f(-1); }
+});
+function stopAll() {
+  player.pause(); queue = [];
+  if (playingBtn) playingBtn.classList.remove('on'); playingBtn = null;
+  if (onTrack) { const f = onTrack; onTrack = null; f(-1); }
+}
+// Истиаза: у кого из чтецов нет записи, читает аль-Хусари
+const AUDHU_OWN = ['Husary_128kbps', 'Alafasy_128kbps', 'Saood_ash-Shuraym_128kbps', 'Ghamadi_40kbps', 'Abu_Bakr_Ash-Shaatree_128kbps'];
+const audhuUrl = () => `https://everyayah.com/data/${AUDHU_OWN.includes(S.qari) ? S.qari : 'Husary_128kbps'}/audhubillah.mp3`;
+// Перед сурой: истиаза, потом Бисмилля (у «Аль-Фатихи» Бисмилля — первый аят, у «Ат-Тауба» её нет)
+const opening = (n) => [audhuUrl(), ...(n === 1 || n === 9 ? [] : [ayahUrl(1, 1)])];
+const AUDHU_AR = 'أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ';
+const BASM_AR = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
+const arNum = (n) => Number(n).toLocaleString('ar-EG');
 const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.4 18.4a9 9 0 0 0 0-12.8"/></svg>';
 function sounds(w) {
   const ex = w.example;
@@ -407,7 +427,7 @@ function go(name, arg) {
   back = null;
   closeSheet();
   window.scrollTo(0, 0);
-  ({ home, words, lesson, toc, sura, welcome, hifzToc, hifz, settings })[name](arg);
+  ({ home, words, lesson, toc, sura, welcome, hifzToc, hifz, settings, quran, read })[name](arg);
   if (tg && tg.BackButton) name === 'home' || name === 'welcome' ? tg.BackButton.hide() : tg.BackButton.show();
 }
 function goBack() { if (!$sheet.hidden) return closeSheet(); if (back) { const b = back; back = null; return b(); } go('home'); }
@@ -448,7 +468,7 @@ function home() {
       </button>
     </div>
     <nav class="list" aria-label="Ещё">
-      <button data-go="toc"><span>Читать суры по словам<span class="sub">Аль-Фатиха и джуз «Амма» с переводом</span></span></button>
+      <button data-go="quran"><span>Читать Коран<span class="sub">Все 114 сур целиком, можно слушать подряд</span></span></button>
       <button data-go="settings"><span>Фон и чтец<span class="sub">${esc((THEMES.find((x) => x[0] === S.theme) || THEMES[0])[1])}, ${esc(qariName())}</span></span></button>
     </nav>
   </div>`;
@@ -494,7 +514,7 @@ function words() {
         ${(S.last || []).length ? `<button data-act="again"><span>Повторить прошлый урок<span class="sub">Те же ${S.last.length} ${plural(S.last.length, 'слово', 'слова', 'слов')}: карточки и тест ещё раз</span></span><b>${S.last.length}</b></button>` : ''}
         <button data-act="review" ${dl.length ? '' : 'disabled'}><span>Повторить забытые<span class="sub">${dl.length ? 'Слова, которые пора освежить' : 'Сегодня повторять нечего'}</span></span><b>${dl.length}</b></button>
         <button data-go="sura" data-n="${cur.sura ?? ''}" data-set="${esc(cur.id)}"><span>${esc(cur.title)}<span class="sub">${cur.sura ? 'Читать по аятам' : 'Набор слов'}</span></span><b>${curDone} из ${cur.words.length}</b></button>
-        <button data-go="toc"><span>Все суры<span class="sub">Аль-Фатиха и джуз «Амма»</span></span><b>${D.sets.length}</b></button>
+        <button data-go="toc"><span>Суры по словам<span class="sub">Аль-Фатиха и джуз «Амма»: коснитесь слова, чтобы узнать перевод</span></span><b>${D.sets.length}</b></button>
       </nav>
       ${cov ? `<p class="note" style="margin-top:16px">${esc(cov)}</p>` : ''}
     </section>
@@ -691,7 +711,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=12`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=13`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -712,7 +732,7 @@ function drawHifz() {
     <h2>${esc(data.title)}</h2>
     <p class="muted">Аят ${a.n} из ${total}, выучено ${done.length}</p>
     ${bar(done.length, total)}
-    ${i === 0 && HZ.n !== 1 && HZ.n !== 9 ? `<div class="sound"><button class="snd" data-act="play" data-url="${esc(ayahUrl(1, 1, S.qari))}">${ICON}Бисмилля перед сурой</button></div>` : ''}
+    ${i === 0 ? `<div class="sound"><button class="snd" data-act="hopen">${ICON}${HZ.n === 1 || HZ.n === 9 ? 'Истиаза перед сурой' : 'Истиаза и Бисмилля перед сурой'}</button></div>` : ''}
     <div class="page hz"><div class="chips" lang="ar">${words}</div>
       <p class="note" style="margin-top:14px">${hide ? 'Вспомните аят. Коснитесь слова, чтобы открыть и послушать его.' : esc(a.ru)}</p>
       ${hide ? '' : `<div class="tools" style="margin-top:12px">${tfBtn(HZ.n, a.n)}${picBtn(HZ.n, a.n)}</div>`}</div>
@@ -734,6 +754,7 @@ function hifzAct(a, t) {
   if (a === 'hgoal') { S.goal = +t.dataset.g; save(); syncProgress(); return hifzToc(); }
   if (a === 'hrem' || a === 'hremoff' || a === 'hremtest') return remAct(a);
   const ay = HZ.data.ayahs[HZ.i];
+  if (a === 'hopen') return play(opening(HZ.n), t);
   if (a === 'hplay') return play(Array(S.rep).fill(ayahUrl(HZ.n, ay.n, S.qari)), t);
   if (a === 'hqari') { player.pause(); go('settings'); back = () => go('hifz'); return; }
   if (a === 'hrep') { S.rep = +t.dataset.r; save(); return drawHifz(); }
@@ -753,6 +774,92 @@ function hifzAct(a, t) {
     if (list.includes(ay.n) && HZ.i < HZ.data.ayahs.length - 1) { HZ.i++; HZ.hide = false; HZ.open = new Set(); window.scrollTo(0, 0); }
     return drawHifz();
   }
+}
+
+/* ---------- чтение Корана целиком ---------- */
+function quran() {
+  $where.textContent = 'Коран';
+  const last = S.rd && SIDX.find((x) => x.n === S.rd.n);
+  $view.innerHTML = `<div class="narrow stack">
+    <h2>Читать Коран</h2>
+    <p class="muted">Все 114 сур целиком. Можно читать самой или слушать суру подряд с выбранным чтецом.</p>
+    ${last ? `<button class="btn" data-go="read" data-n="${last.n}" data-a="${S.rd.a}">Продолжить: «${esc(last.title)}», аят ${S.rd.a}</button>` : ''}
+    <input class="find" id="qFind" type="search" placeholder="Найти суру: название или номер" aria-label="Найти суру">
+    <div class="list" id="qList">${SIDX.map((x) => `<button data-go="read" data-n="${x.n}" data-q="${esc((x.n + ' ' + x.title).toLowerCase())}"><span>${x.n}. ${esc(x.title)}<span class="sub">Джуз ${x.juz}, ${x.ayahs} ${plural(x.ayahs, 'аят', 'аята', 'аятов')}</span></span></button>`).join('')}</div>
+  </div>`;
+  document.getElementById('qFind').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase().replace(/[-‘’'ʼ]/g, '');
+    document.querySelectorAll('#qList > button').forEach((b) => { b.hidden = q && !b.dataset.q.replace(/[-‘’'ʼ]/g, '').includes(q); });
+  });
+}
+let RD = null;
+async function read(arg) {
+  const n = +((arg && arg.n) || (RD && RD.n));
+  $where.textContent = suraName(n);
+  if (!RD || RD.n !== n || !RD.data) {
+    RD = { n, data: null, cur: -1 };
+    $view.innerHTML = '<p class="muted">Открываем суру…</p>';
+    try { RD.data = await hzSura(n); } catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
+    if (screen !== 'read') return;
+  }
+  back = () => go('quran');
+  drawRead(arg && arg.a);
+}
+function drawRead(toAyah) {
+  const { n, data } = RD;
+  const info = SIDX.find((x) => x.n === n) || { ayahs: data.ayahs.length, juz: data.ayahs[0].juz };
+  const tr = S.tr !== false, fs = S.fs || 1;
+  const ayah = (a) => `<span class="ra${RD.cur === a.n ? ' now' : ''}" id="ra${a.n}" data-act="ra" data-a="${a.n}">${esc(a.w.join(' '))} <span class="rn">﴿${arNum(a.n)}﴾</span></span>`;
+  $view.innerHTML = `<div class="narrow stack">
+    <h2>${n}. ${esc(data.title)}</h2>
+    <p class="muted">${info.ayahs} ${plural(info.ayahs, 'аят', 'аята', 'аятов')}, джуз ${info.juz}. Коснитесь аята: слушать с него, тафсир, картинка.</p>
+    <div class="row2">
+      <button class="btn" data-act="rplay">${ICON}${RD.cur > 0 ? 'Стоп' : 'Слушать'}</button>
+      <button class="btn ghost" data-act="rtr">${tr ? 'Без перевода' : 'С переводом'}</button>
+    </div>
+    <div class="seg three" role="group" aria-label="Размер текста">${[[1, 'Обычный'], [1.25, 'Крупнее'], [1.5, 'Крупный']].map(([k, t]) => `<button data-act="rfs" data-f="${k}" class="${fs === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+    <div class="mushaf" lang="ar" dir="rtl" style="--fs:${fs}">
+      <p class="opening">${esc(AUDHU_AR)}</p>
+      ${n !== 1 && n !== 9 ? `<p class="opening basm">${esc(BASM_AR)}</p>` : ''}
+      ${tr ? data.ayahs.map((a) => `<div class="rv">${ayah(a)}<p class="note" lang="ru" dir="ltr">${a.n}. ${esc(a.ru)}</p></div>`).join('') : `<p class="flow">${data.ayahs.map(ayah).join(' ')}</p>`}
+    </div>
+    <div class="row2">
+      <button class="btn ghost" data-go="read" data-n="${n - 1}" ${n > 1 ? '' : 'disabled'}>Предыдущая сура</button>
+      <button class="btn ghost" data-go="read" data-n="${n + 1}" ${n < 114 ? '' : 'disabled'}>Следующая сура</button>
+    </div>
+    <p class="note">Перевод смыслов: Э. Кулиев. Чтец: ${esc(qariName())}, сменить можно в разделе «Фон и чтец».</p>
+  </div>`;
+  if (toAyah) { const el = document.getElementById('ra' + toAyah); if (el) el.scrollIntoView({ block: 'center' }); }
+}
+function readFrom(a, btn) {
+  const { n, data } = RD;
+  const list = data.ayahs.filter((x) => x.n >= a);
+  const pre = a === 1 ? opening(n) : [];
+  S.rd = { n, a }; save();
+  const mark = (i) => {
+    document.querySelectorAll('.ra.now').forEach((el) => el.classList.remove('now'));
+    const rb = document.querySelector('[data-act="rplay"]');
+    if (i < 0) { RD.cur = -1; if (rb && screen === 'read') rb.innerHTML = ICON + 'Слушать'; return; }
+    if (rb) rb.innerHTML = ICON + 'Стоп';
+    const k = i - pre.length; if (k < 0) return;
+    RD.cur = list[k].n; S.rd = { n, a: RD.cur };
+    const el = document.getElementById('ra' + RD.cur);
+    if (el && screen === 'read') { el.classList.add('now'); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  };
+  play([...pre, ...list.map((x) => ayahUrl(n, x.n))], btn, mark);
+}
+function openAyahMenu(a) {
+  const n = RD.n, ay = RD.data.ayahs.find((x) => x.n === a);
+  S.rd = { n, a }; save();
+  $sheet.hidden = false;
+  $sheet.innerHTML = `<div class="sheet-wrap" data-act="close"><div class="sheet" role="dialog" aria-label="Аят ${a}">
+    <h3>«${esc(suraName(n))}», аят ${a}</h3>
+    <p class="note">${esc(ay.ru)}</p>
+    <button class="btn" data-act="rfrom" data-a="${a}">${ICON}Слушать с этого аята</button>
+    <div class="row2"><button class="btn ghost" data-act="tafsir" data-n="${n}" data-a="${a}">${BOOK}Тафсир</button><button class="btn ghost" data-act="share" data-n="${n}" data-a="${a}">${PIC}Картинка</button></div>
+    <button class="btn ghost" data-act="close">Закрыть</button>
+  </div></div>`;
+  haptic();
 }
 
 /* ---------- оглавление ---------- */
@@ -828,10 +935,16 @@ function openSheet(id, url) {
 function closeSheet() { $sheet.hidden = true; $sheet.innerHTML = ''; }
 
 /* ---------- события ---------- */
+const a0 = (t) => t.dataset.act;
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-act],[data-go]');
   if (!t) return;
-  if (t.dataset.go) return go(t.dataset.go, { n: t.dataset.n, set: t.dataset.set });
+  if (t.dataset.go) return go(t.dataset.go, { n: t.dataset.n, set: t.dataset.set, a: +t.dataset.a || null });
+  if (a0(t) === 'ra') return openAyahMenu(+t.dataset.a);
+  if (a0(t) === 'rfrom') { closeSheet(); return readFrom(+t.dataset.a, document.querySelector('[data-act="rplay"]')); }
+  if (a0(t) === 'rplay') { if (RD.cur > 0 || (playingBtn === t && !player.paused)) return stopAll(); return readFrom(1, t); }
+  if (a0(t) === 'rtr') { S.tr = S.tr === false; save(); return drawRead(RD.cur > 0 ? RD.cur : null); }
+  if (a0(t) === 'rfs') { S.fs = +t.dataset.f; save(); return drawRead(); }
   const a = t.dataset.act;
   if (a === 'close') { if (e.target === t || t.tagName === 'BUTTON') closeSheet(); return; }
   if (a && a[0] === 'h' && a !== 'hello') return hifzAct(a, t);
@@ -862,9 +975,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=12').then((r) => r.json()),
-      fetch('data/coverage.json?v=12').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=12').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=13').then((r) => r.json()),
+      fetch('data/coverage.json?v=13').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=13').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
@@ -872,7 +985,7 @@ document.addEventListener('click', (e) => {
   }
   D.sets.forEach((s) => s.words.forEach((id) => { if (!setOf[id] && D.words[id]) { setOf[id] = s.id; order.push(id); } }));
   S.set = D.sets[0].id;
-  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi, h: b.s.h || {}, rep: b.s.rep || 3, qari: b.s.qari || 'Husary_Muallim_128kbps', hd: b.s.hd || {}, goal: b.s.goal || 3, rem: b.s.rem || { on: false, time: '07:00' }, last: b.s.last || [], theme: b.s.theme || 'night', tf: b.s.tf || 'saadi' }; applyTheme(); };
+  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi, h: b.s.h || {}, rep: b.s.rep || 3, qari: b.s.qari || 'Husary_Muallim_128kbps', hd: b.s.hd || {}, goal: b.s.goal || 3, rem: b.s.rem || { on: false, time: '07:00' }, last: b.s.last || [], theme: b.s.theme || 'night', tf: b.s.tf || 'saadi', rd: b.s.rd || null, tr: b.s.tr, fs: b.s.fs || 1 }; applyTheme(); };
   const local = loadLocal();
   apply(local);
   applyTheme();

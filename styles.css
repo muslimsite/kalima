@@ -173,3 +173,18 @@ p { text-wrap: pretty; }
 /* Картинка аята для статуса */
 .tabs.two { grid-template-columns: 1fr 1fr; }
 .shot { width: 100%; max-width: 300px; max-height: 52svh; object-fit: contain; margin: 0 auto; border-radius: 16px; border: 1px solid var(--line); }
+
+/* Чтение Корана */
+.find { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--raise); color: var(--ink); font: 400 var(--s2)/1 var(--f-text); padding: 0 14px; width: 100%; }
+.find::placeholder { color: var(--muted); }
+.seg.three { grid-template-columns: repeat(3, 1fr); }
+.mushaf { padding: 24px 16px; border-radius: 24px; background: radial-gradient(120% 40% at 50% 0%, var(--lamp) 0%, var(--raise) 60%); font: 400 calc(1.75rem * var(--fs, 1))/2.1 var(--f-ar); text-align: justify; }
+.mushaf .opening { text-align: center; color: var(--muted); font-size: .8em; }
+.mushaf .basm { color: var(--ink); font-size: 1em; margin-bottom: 8px; }
+.mushaf .flow { text-align: justify; text-align-last: center; }
+.mushaf .rv { padding: 12px 0; border-bottom: 1px solid var(--line); text-align: right; }
+.mushaf .rv:last-child { border-bottom: 0; }
+.mushaf .rv .note { font-family: var(--f-text); line-height: 1.5; text-align: left; margin-top: 6px; }
+.ra { cursor: pointer; border-radius: 8px; transition: background-color .2s ease, color .2s ease; }
+.ra.now { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.rn { color: var(--accent); font-size: .85em; white-space: nowrap; }
