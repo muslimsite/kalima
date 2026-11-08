@@ -130,7 +130,7 @@ async function openTafsir(n, a) {
 const BOT = 'Koran_slovo_bot';
 const BOT_URL = 'https://t.me/' + BOT;
 const hzCache = {};
-const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=13`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
+const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=14`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
 let qrLib = null;
 function loadQr() {
   if (window.qrcode) return Promise.resolve(window.qrcode);
@@ -469,9 +469,20 @@ function home() {
     </div>
     <nav class="list" aria-label="Ещё">
       <button data-go="quran"><span>Читать Коран<span class="sub">Все 114 сур целиком, можно слушать подряд</span></span></button>
+      ${HOME_OK ? `<button data-act="homescreen"><span>Добавить на экран телефона<span class="sub">Значок «Калимы» рядом с другими приложениями</span></span></button>` : ''}
       <button data-go="settings"><span>Фон и чтец<span class="sub">${esc((THEMES.find((x) => x[0] === S.theme) || THEMES[0])[1])}, ${esc(qariName())}</span></span></button>
     </nav>
   </div>`;
+}
+
+/* ---------- значок на экране телефона (Telegram 8.0+) ---------- */
+let HOME_OK = false;
+function checkHome() {
+  if (!(tg && tg.addToHomeScreen && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))) return;
+  try {
+    tg.checkHomeScreenStatus((st) => { HOME_OK = st !== 'unsupported' && st !== 'added'; if (screen === 'home') home(); });
+    tg.onEvent('homeScreenAdded', () => { HOME_OK = false; haptic('ok'); if (screen === 'home') home(); });
+  } catch (e) {}
 }
 
 /* ---------- фон и чтец ---------- */
@@ -711,7 +722,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=13`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=14`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -958,6 +969,7 @@ document.addEventListener('click', (e) => {
   if (a === 'next-q') { L.qi++; return drawTest(); }
   if (a === 'word') { if (t.dataset.url) play(t.dataset.url); return openSheet(t.dataset.id, t.dataset.url); }
   if (a === 'play') { e.stopPropagation(); return play(t.dataset.url, t); }
+  if (a === 'homescreen') { try { tg.addToHomeScreen(); } catch (e) {} return; }
   if (a === 'theme') { S.theme = t.dataset.k; save(); applyTheme(); haptic(); return settings(); }
   if (a === 'qari') { S.qari = t.dataset.q; save(); haptic(); const keep = back; settings(); back = keep; return play(ayahUrl(1, 2), $view.querySelector(`[data-q="${t.dataset.q}"]`)); }
   if (a === 'share') { e.stopPropagation(); haptic(); return openShare(+t.dataset.n, +t.dataset.a); }
@@ -975,9 +987,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=13').then((r) => r.json()),
-      fetch('data/coverage.json?v=13').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=13').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=14').then((r) => r.json()),
+      fetch('data/coverage.json?v=14').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=14').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
@@ -989,6 +1001,7 @@ document.addEventListener('click', (e) => {
   const local = loadLocal();
   apply(local);
   applyTheme();
+  checkHome();
   go(!S.hi ? 'welcome' : location.hash === '#hifz' ? 'hifzToc' : 'home');
   const remote = await loadCloud();
   if (remote && (!local || remote.t > local.t)) { apply(remote); if (screen === 'home' || (screen === 'welcome' && S.hi)) go('home'); }
