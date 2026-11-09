@@ -9,8 +9,10 @@ export function pickQuiz(userId, day) {
   const i = (Math.abs(Number(userId)) + day) % WORDS.length, w = WORDS[i];
   let seed = (i * 31 + day) >>> 0;
   const rnd = (n) => { seed = (seed * 1664525 + 1013904223) >>> 0; return (seed >>> 8) % n; };
-  // Неверные варианты: та же часть речи, другой перевод и другой корень, чтобы не попался почти синоним
-  const pool = WORDS.filter((x) => x !== w && x[3] === w[3] && x[2] !== w[2] && (!w[4] || x[4] !== w[4]));
+  // Неверные варианты: другой перевод и другой корень. Среди прилагательных много близких по смыслу
+  // («Знающий», «Ведающий»), поэтому к ним берём существительные, чтобы правильный ответ был один.
+  const kind = w[3] === 1 ? 0 : w[3];
+  const pool = WORDS.filter((x) => x !== w && x[3] === kind && x[2] !== w[2] && (!w[4] || x[4] !== w[4]));
   const wrong = [];
   while (wrong.length < 2) {
     const r = pool[rnd(pool.length)][2];
