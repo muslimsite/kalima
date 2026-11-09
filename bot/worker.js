@@ -48,7 +48,7 @@ async function touch(env, id, kind, words, hifz) {
 
 async function statsText(env) {
   const one = (sql) => env.DB.prepare(sql).first('n');
-  const [all, today, week, actToday, actWeek, app, words, hifz, rem, daily] = await Promise.all([
+  const [all, today, week, actToday, actWeek, app, words, hifz, rem, daily, qToday, qOk, qWeek] = await Promise.all([
     one('SELECT COUNT(*) n FROM users'),
     one("SELECT COUNT(*) n FROM users WHERE first_seen >= date('now')"),
     one("SELECT COUNT(*) n FROM users WHERE first_seen >= date('now','-6 days')"),
@@ -59,6 +59,9 @@ async function statsText(env) {
     one('SELECT COUNT(*) n FROM users WHERE hifz > 0'),
     one('SELECT COUNT(*) n FROM reminders WHERE enabled = 1'),
     one('SELECT COUNT(*) n FROM daily WHERE enabled = 1'),
+    one("SELECT COUNT(*) n FROM quiz_answers WHERE day >= date('now')"),
+    one("SELECT COALESCE(SUM(correct), 0) n FROM quiz_answers WHERE day >= date('now')"),
+    one("SELECT COUNT(DISTINCT user_id) n FROM quiz_answers WHERE day >= date('now','-6 days')"),
   ]);
   return '📊 Статистика «Калимы»\n\n' +
     `Всего пользователей: ${all}\n` +
@@ -69,6 +72,8 @@ async function statsText(env) {
     `Учат хифз: ${hifz}\n` +
     `Включили напоминания: ${rem}\n` +
     `Подписаны на слово дня: ${daily}\n\n` +
+    `Ответов на тест сегодня: ${qToday}, верных: ${qOk}\n` +
+    `Прошли тест за 7 дней: ${qWeek} чел.\n\n` +
     'Время по UTC (Москва на 3 часа больше).';
 }
 
@@ -98,7 +103,7 @@ function remindMarkup(env) {
 async function sendReminder(env, chatId, goal, learned, tz) {
   const text = reminderText(goal, learned), reply_markup = remindMarkup(env);
   const day = Math.floor((Date.now() - tz * 60000) / 86400000);
-  const res = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(pickQuiz(chatId, day)), caption: text, reply_markup });
+  const res = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(pickQuiz(chatId, day)), allow_queries: true, caption: text, reply_markup });
   if (res.ok || res.error_code === 403) return res;
   console.error('sendWidget', res.error_code, res.description);
   return tgApi(env, 'sendMessage', { chat_id: chatId, text, reply_markup });
@@ -119,7 +124,7 @@ const localDay = (tz) => new Date(Date.now() - tz * 60000).toISOString().slice(0
 
 async function sendWord(env, chatId, tz, caption, reply_markup) {
   const q = pickQuiz(chatId, dayNum(tz));
-  const res = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(q), caption, reply_markup });
+  const res = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(q), allow_queries: true, caption, reply_markup });
   if (res.ok || res.error_code === 403) return res;
   console.error('sendWidget', res.error_code, res.description);
   return tgApi(env, 'sendMessage', { chat_id: chatId, text: quizFallback(q) + '\n\n' + caption, parse_mode: 'HTML', reply_markup });
@@ -154,6 +159,15 @@ async function dailyCallback(env, cq) {
   await setDaily(env, cq.from.id, false);
   await keys(a === 'off' ? onKeys : { inline_keyboard: [] });
   return answer(a === 'off' ? 'Отключено. Включить снова можно в приложении' : 'Хорошо, присылать не буду');
+}
+// Тест сообщает об ответе. Считаем один ответ на сообщение, старше 30 дней не храним.
+async function quizAnswer(env, wq) {
+  const m = /^q:([01])$/.exec(wq.data || '');
+  if (m && wq.message_id && wq.from) {
+    await env.DB.prepare("INSERT OR IGNORE INTO quiz_answers (user_id, message_id, day, correct) VALUES (?1, ?2, date('now'), ?3)").bind(wq.from.id, wq.message_id, Number(m[1])).run().catch((e) => console.error('quiz', e.message));
+    await env.DB.prepare("DELETE FROM quiz_answers WHERE day < date('now', '-30 days')").run().catch(() => {});
+  }
+  return tgApi(env, 'answerWidgetQuery', { widget_query_id: wq.id });
 }
 // Часть дневной нормы отправок: сначала слово дня подписчикам, потом разовое предложение
 async function dailyRun(env, limit) {
@@ -304,7 +318,7 @@ export default {
 
     if (url.pathname === '/setup') {
       const out = {
-        webhook: await api('setWebhook', { url: `${url.origin}/hook`, secret_token: secret, allowed_updates: ['message', 'callback_query'], drop_pending_updates: true }),
+        webhook: await api('setWebhook', { url: `${url.origin}/hook`, secret_token: secret, allowed_updates: ['message', 'callback_query', 'widget_query'], drop_pending_updates: true }),
         menu: await api('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Учить слова', web_app: { url: env.APP_URL } } }),
         description: await api('setMyDescription', { description: DESCRIPTION }),
         short: await api('setMyShortDescription', { short_description: SHORT }),
@@ -317,6 +331,8 @@ export default {
     if (url.pathname === '/hook' && req.method === 'POST') {
       if (req.headers.get('X-Telegram-Bot-Api-Secret-Token') !== secret) return new Response('forbidden', { status: 403 });
       const update = await req.json().catch(() => null);
+      const wq = update && update.widget_query;
+      if (wq) { await quizAnswer(env, wq); return new Response('ok'); }
       const cq = update && update.callback_query;
       if (cq && typeof cq.data === 'string' && cq.data.startsWith('daily:')) { await dailyCallback(env, cq); return new Response('ok'); }
       const msg = update && update.message;

@@ -41,3 +41,12 @@ CREATE TABLE IF NOT EXISTS daily (
   last_day TEXT,                      -- местная дата последнего слова
   updated TEXT
 );
+
+-- Ответы на тест «Слово дня» для /stats: только номер аккаунта и верно или нет, хранится 30 дней
+CREATE TABLE IF NOT EXISTS quiz_answers (
+  user_id INTEGER NOT NULL,
+  message_id INTEGER NOT NULL,
+  day TEXT NOT NULL,
+  correct INTEGER NOT NULL,
+  PRIMARY KEY (user_id, message_id)
+);

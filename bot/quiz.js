@@ -48,6 +48,7 @@ document.getElementById('r').textContent=i==A?'Верно, машаАллах!':
 }
 B.forEach(function(b,i){b.addEventListener('click',function(){
 try{localStorage.setItem('c',i)}catch(e){}
+try{if(T&&T.request)T.request('q:'+(i==A?1:0)).catch(function(){})}catch(e){}
 if(T&&T.HapticFeedback)T.HapticFeedback.notificationOccurred(i==A?'success':'error');
 show(i)
 })});
