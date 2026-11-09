@@ -2,6 +2,8 @@
 // /start → приветствие с кнопкой, которая открывает мини-приложение.
 // /setup → один раз подключает вебхук, кнопку меню и описание бота.
 
+import { pickQuiz, quizHtml } from './quiz.js';
+
 const CHANNEL = 'https://t.me/+K04B4CsLj8E1OTc6';
 const HELLO =
   'В Коране больше 77 тысяч слов, но 76% текста складываются всего из 417 🤫 Одно только «сказал» во всех формах повторяется там 1618 раз, а «Господь» 975 раз. Поэтому, когда выучишь эти слова, на странице Корана уже будет много знакомого.\n\n' +
@@ -90,6 +92,16 @@ function remindMarkup(env) {
   return { inline_keyboard: [[{ text: 'Открыть хифз', web_app: { url: env.APP_URL + '#hifz' } }]] };
 }
 
+// Напоминание с мини-тестом внутри. Если Telegram не принял виджет, уходит обычное сообщение с той же кнопкой.
+async function sendReminder(env, chatId, goal, learned, tz) {
+  const text = reminderText(goal, learned), reply_markup = remindMarkup(env);
+  const day = Math.floor((Date.now() - tz * 60000) / 86400000);
+  const res = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(pickQuiz(chatId, day)), caption: text, reply_markup });
+  if (res.ok || res.error_code === 403) return res;
+  console.error('sendWidget', res.error_code, res.description);
+  return tgApi(env, 'sendMessage', { chat_id: chatId, text, reply_markup });
+}
+
 export default {
   async scheduled(event, env) {
     const now = Date.now();
@@ -100,7 +112,7 @@ export default {
     for (const r of results || []) {
       const day = new Date(now - r.tz * 60000).toISOString().slice(0, 10);
       if (r.last_day === day) continue;
-      const res = await tgApi(env, 'sendMessage', { chat_id: r.user_id, text: reminderText(r.goal, r.learned), reply_markup: remindMarkup(env) });
+      const res = await sendReminder(env, r.user_id, r.goal, r.learned, r.tz);
       if (res.ok) await env.DB.prepare('UPDATE reminders SET last_day = ?1 WHERE user_id = ?2').bind(day, r.user_id).run();
       else if (res.error_code === 403) await env.DB.prepare('UPDATE reminders SET enabled = 0 WHERE user_id = ?1').bind(r.user_id).run();
     }
@@ -178,7 +190,7 @@ export default {
         `INSERT INTO reminders (user_id, enabled, utc_min, tz, goal, learned, updated) VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))
          ON CONFLICT(user_id) DO UPDATE SET enabled = ?2, utc_min = ?3, tz = ?4, goal = ?5, learned = ?6, updated = datetime('now')`
       ).bind(user.id, body.enabled ? 1 : 0, utcMin, tz, goal, learned).run();
-      if (body.test) await tgApi(env, 'sendMessage', { chat_id: user.id, text: reminderText(goal, learned), reply_markup: remindMarkup(env) });
+      if (body.test) await sendReminder(env, user.id, goal, learned, tz);
       return new Response('{"ok":true}', { headers: cors });
     }
     if (!env.BOT_TOKEN) return new Response('Нет секрета BOT_TOKEN. Выполните: npx wrangler secret put BOT_TOKEN', { status: 500 });
