@@ -130,7 +130,7 @@ async function openTafsir(n, a) {
 const BOT = 'Koran_slovo_bot';
 const BOT_URL = 'https://t.me/' + BOT;
 const hzCache = {};
-const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=16`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
+const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=17`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
 let qrLib = null;
 function loadQr() {
   if (window.qrcode) return Promise.resolve(window.qrcode);
@@ -493,9 +493,22 @@ function home() {
     <nav class="list" aria-label="Ещё">
       <button data-go="quran"><span>Читать Коран<span class="sub">Все 114 сур целиком, можно слушать подряд</span></span></button>
       ${HOME_OK ? `<button data-act="homescreen"><span>Добавить на экран телефона<span class="sub">Значок «Калимы» рядом с другими приложениями</span></span></button>` : ''}
+      ${DAILY !== null && !S.rem.on ? `<button data-act="daily" class="${DAILY ? 'on' : ''}" aria-pressed="${DAILY}"><span>Слово дня от бота<span class="sub">Каждый день в 9:00 с мини-тестом</span></span><span class="tick">${DAILY ? TICK : ''}</span></button>` : ''}
       <button data-go="settings"><span>Фон и чтец<span class="sub">${esc((THEMES.find((x) => x[0] === S.theme) || THEMES[0])[1])}, ${esc(qariName())}</span></span></button>
     </nav>
   </div>`;
+}
+
+/* ---------- слово дня от бота ---------- */
+let DAILY = null; // null, пока бот не ответил: тогда строку не показываем
+async function toggleDaily() {
+  const on = !DAILY;
+  if (on && tg.requestWriteAccess) await new Promise((res) => { try { tg.requestWriteAccess(() => res()); } catch (e) { res(); } });
+  DAILY = on; haptic('ok'); if (screen === 'home') home();
+  try {
+    const r = await fetch(API.replace('/remind', '/daily'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ initData: tg.initData, on, tz: new Date().getTimezoneOffset() }) });
+    if (!r.ok) throw new Error('daily');
+  } catch (e) { DAILY = !on; if (screen === 'home') home(); }
 }
 
 /* ---------- значок на экране телефона (Telegram 8.0+) ---------- */
@@ -834,7 +847,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=16`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=17`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -1094,6 +1107,7 @@ document.addEventListener('click', (e) => {
   if (a0(t) === 'rfs') { S.fs = +t.dataset.f; save(); return drawRead(); }
   const a = t.dataset.act;
   if (a === 'close') { if (e.target === t || t.tagName === 'BUTTON') closeSheet(); return; }
+  if (a === 'daily') return toggleDaily();
   if (a === 'kjuz' || a === 'ksura') return knownAct(a, t);
   if (a && a[0] === 'h' && a !== 'hello') return hifzAct(a, t);
   if (a === 'hello') { S.hi = true; save(); haptic('ok'); return go('home'); }
@@ -1124,9 +1138,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=16').then((r) => r.json()),
-      fetch('data/coverage.json?v=16').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=16').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=17').then((r) => r.json()),
+      fetch('data/coverage.json?v=17').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=17').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
@@ -1143,5 +1157,5 @@ document.addEventListener('click', (e) => {
   const remote = await loadCloud();
   if (remote && (!local || remote.t > local.t)) { apply(remote); if (screen === 'home' || (screen === 'welcome' && S.hi)) go('home'); }
   // Счётчик для автора: бот отмечает, что человек открыл приложение (только номер аккаунта и сколько выучено).
-  if (tg && tg.initData) fetch(API.replace('/remind', '/seen'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ initData: tg.initData, words: Object.keys(P).length, hifz: hifzDone() }) }).catch(() => {});
+  if (tg && tg.initData) fetch(API.replace('/remind', '/seen'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ initData: tg.initData, words: Object.keys(P).length, hifz: hifzDone() }) }).then((r) => r.json()).then((b) => { if (b && typeof b.daily === 'boolean') { DAILY = b.daily; if (screen === 'home') home(); } }).catch(() => {});
 })();

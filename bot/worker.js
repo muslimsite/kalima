@@ -2,7 +2,7 @@
 // /start → приветствие с кнопкой, которая открывает мини-приложение.
 // /setup → один раз подключает вебхук, кнопку меню и описание бота.
 
-import { pickQuiz, quizHtml } from './quiz.js';
+import { pickQuiz, quizHtml, quizFallback } from './quiz.js';
 
 const CHANNEL = 'https://t.me/+K04B4CsLj8E1OTc6';
 const HELLO =
@@ -48,7 +48,7 @@ async function touch(env, id, kind, words, hifz) {
 
 async function statsText(env) {
   const one = (sql) => env.DB.prepare(sql).first('n');
-  const [all, today, week, actToday, actWeek, app, words, hifz, rem] = await Promise.all([
+  const [all, today, week, actToday, actWeek, app, words, hifz, rem, daily] = await Promise.all([
     one('SELECT COUNT(*) n FROM users'),
     one("SELECT COUNT(*) n FROM users WHERE first_seen >= date('now')"),
     one("SELECT COUNT(*) n FROM users WHERE first_seen >= date('now','-6 days')"),
@@ -58,6 +58,7 @@ async function statsText(env) {
     one('SELECT COUNT(*) n FROM users WHERE words > 0'),
     one('SELECT COUNT(*) n FROM users WHERE hifz > 0'),
     one('SELECT COUNT(*) n FROM reminders WHERE enabled = 1'),
+    one('SELECT COUNT(*) n FROM daily WHERE enabled = 1'),
   ]);
   return '📊 Статистика «Калимы»\n\n' +
     `Всего пользователей: ${all}\n` +
@@ -66,7 +67,8 @@ async function statsText(env) {
     `Открывали приложение: ${app}\n` +
     `Учат слова: ${words}\n` +
     `Учат хифз: ${hifz}\n` +
-    `Включили напоминания: ${rem}\n\n` +
+    `Включили напоминания: ${rem}\n` +
+    `Подписаны на слово дня: ${daily}\n\n` +
     'Время по UTC (Москва на 3 часа больше).';
 }
 
@@ -102,6 +104,81 @@ async function sendReminder(env, chatId, goal, learned, tz) {
   return tgApi(env, 'sendMessage', { chat_id: chatId, text, reply_markup });
 }
 
+/* ---------- «Слово дня» ---------- */
+const OFFER = 'Это слово дня: одно слово из Корана и перевод на выбор. Присылать такое каждый день в 9:00 по Москве?';
+const OFFER_ALL = 'Ассаляму алейкум!\n\n' + OFFER;
+const DAILY_TEXT = 'Слово дня из Корана. Учить дальше можно в тренажёре.';
+const SEND_LIMIT = 20; // за один запуск по расписанию: у бесплатного Cloudflare ограничено число запросов
+const localMod = "(-tz) || ' minutes'";
+const offerKeys = { inline_keyboard: [[{ text: 'Присылать каждый день', callback_data: 'daily:on' }, { text: 'Не надо', callback_data: 'daily:no' }]] };
+const offKey = [{ text: 'Отключить слово дня', callback_data: 'daily:off' }];
+const onKeys = { inline_keyboard: [[{ text: 'Присылать каждый день', callback_data: 'daily:on' }]] };
+const dailyKeys = (env) => ({ inline_keyboard: [[{ text: BUTTON, web_app: { url: env.APP_URL } }], offKey] });
+const dayNum = (tz) => Math.floor((Date.now() - tz * 60000) / 86400000);
+const localDay = (tz) => new Date(Date.now() - tz * 60000).toISOString().slice(0, 10);
+
+async function sendWord(env, chatId, tz, caption, reply_markup) {
+  const q = pickQuiz(chatId, dayNum(tz));
+  const res = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(q), caption, reply_markup });
+  if (res.ok || res.error_code === 403) return res;
+  console.error('sendWidget', res.error_code, res.description);
+  return tgApi(env, 'sendMessage', { chat_id: chatId, text: quizFallback(q) + '\n\n' + caption, parse_mode: 'HTML', reply_markup });
+}
+// Включает или выключает подписку. Сегодняшний день считается закрытым: человек только что видел слово.
+async function setDaily(env, id, on, tz) {
+  const hasTz = Number.isFinite(tz);
+  await env.DB.prepare(
+    `INSERT INTO daily (user_id, enabled, pending, tz, last_day, updated) VALUES (?1, ?2, 0, ?3, date('now', (-?3) || ' minutes'), datetime('now'))
+     ON CONFLICT(user_id) DO UPDATE SET enabled = ?2, pending = 0, tz = CASE WHEN ?4 THEN ?3 ELSE tz END,
+       last_day = date('now', (-(CASE WHEN ?4 THEN ?3 ELSE tz END)) || ' minutes'), updated = datetime('now')`
+  ).bind(id, on ? 1 : 0, hasTz ? tz : -180, hasTz ? 1 : 0).run();
+}
+// Предложение после /start: один раз и только если слово дня ещё не приходит
+async function offerAfterStart(env, id) {
+  const known = await env.DB.prepare('SELECT 1 n FROM daily WHERE user_id = ?1').bind(id).first('n');
+  if (known) return;
+  const rem = await env.DB.prepare('SELECT 1 n FROM reminders WHERE user_id = ?1 AND enabled = 1').bind(id).first('n');
+  if (rem) return;
+  await env.DB.prepare("INSERT OR IGNORE INTO daily (user_id, enabled, updated) VALUES (?1, 0, datetime('now'))").bind(id).run();
+  await sendWord(env, id, -180, OFFER, offerKeys);
+}
+async function dailyCallback(env, cq) {
+  const answer = (text) => tgApi(env, 'answerCallbackQuery', { callback_query_id: cq.id, text });
+  const keys = (reply_markup) => cq.message ? tgApi(env, 'editMessageReplyMarkup', { chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup }) : null;
+  const a = cq.data.split(':')[1];
+  if (a === 'on') {
+    await setDaily(env, cq.from.id, true);
+    await keys({ inline_keyboard: [offKey] });
+    return answer('Готово, слово дня будет приходить каждый день');
+  }
+  await setDaily(env, cq.from.id, false);
+  await keys(a === 'off' ? onKeys : { inline_keyboard: [] });
+  return answer(a === 'off' ? 'Отключено. Включить снова можно в приложении' : 'Хорошо, присылать не буду');
+}
+// Часть дневной нормы отправок: сначала слово дня подписчикам, потом разовое предложение
+async function dailyRun(env, limit) {
+  if (limit <= 0) return;
+  const lm = localMod.replaceAll('tz', 'd.tz');
+  const { results: due } = await env.DB.prepare(
+    `SELECT d.user_id, d.tz FROM daily d LEFT JOIN reminders r ON r.user_id = d.user_id AND r.enabled = 1
+     WHERE d.enabled = 1 AND r.user_id IS NULL AND (d.last_day IS NULL OR d.last_day <> date('now', ${lm}))
+       AND CAST(strftime('%H', 'now', ${lm}) AS INTEGER) * 60 + CAST(strftime('%M', 'now', ${lm}) AS INTEGER) >= d.local_min
+     LIMIT ?1`
+  ).bind(limit).all();
+  for (const d of due || []) {
+    const res = await sendWord(env, d.user_id, d.tz, DAILY_TEXT, dailyKeys(env));
+    if (res.ok) await env.DB.prepare('UPDATE daily SET last_day = ?1 WHERE user_id = ?2').bind(localDay(d.tz), d.user_id).run();
+    else if (res.error_code === 403) await env.DB.prepare('UPDATE daily SET enabled = 0 WHERE user_id = ?1').bind(d.user_id).run();
+  }
+  const left = limit - (due || []).length;
+  if (left <= 0) return;
+  const { results: wait } = await env.DB.prepare('SELECT user_id, tz FROM daily WHERE pending = 1 LIMIT ?1').bind(left).all();
+  for (const d of wait || []) {
+    await sendWord(env, d.user_id, d.tz, OFFER_ALL, offerKeys);
+    await env.DB.prepare('UPDATE daily SET pending = 0 WHERE user_id = ?1').bind(d.user_id).run();
+  }
+}
+
 export default {
   async scheduled(event, env) {
     const now = Date.now();
@@ -109,13 +186,16 @@ export default {
     const { results } = await env.DB.prepare(
       'SELECT * FROM reminders WHERE enabled = 1 AND ((utc_min > ?1 - 5 AND utc_min <= ?1) OR (?1 < 5 AND utc_min > ?1 + 1435))'
     ).bind(m).all();
+    let sent = 0;
     for (const r of results || []) {
       const day = new Date(now - r.tz * 60000).toISOString().slice(0, 10);
       if (r.last_day === day) continue;
       const res = await sendReminder(env, r.user_id, r.goal, r.learned, r.tz);
+      sent++;
       if (res.ok) await env.DB.prepare('UPDATE reminders SET last_day = ?1 WHERE user_id = ?2').bind(day, r.user_id).run();
       else if (res.error_code === 403) await env.DB.prepare('UPDATE reminders SET enabled = 0 WHERE user_id = ?1').bind(r.user_id).run();
     }
+    await dailyRun(env, SEND_LIMIT - sent);
   },
 
   async fetch(req, env) {
@@ -167,6 +247,19 @@ export default {
       const user = await checkInitData(body.initData, env.BOT_TOKEN);
       if (!user || !user.id) return new Response('{"ok":false}', { status: 401, headers: cors });
       await touch(env, user.id, 'open', Math.max(0, Math.min(5000, Number(body.words) || 0)), Math.max(0, Math.min(6236, Number(body.hifz) || 0)));
+      const daily = await env.DB.prepare('SELECT enabled n FROM daily WHERE user_id = ?1').bind(user.id).first('n');
+      return new Response(JSON.stringify({ ok: true, daily: !!daily }), { headers: cors });
+    }
+
+    if (url.pathname === '/api/daily') {
+      const origin = req.headers.get('Origin') || '';
+      const cors = { 'Access-Control-Allow-Origin': ORIGINS.includes(origin) ? origin : ORIGINS[0], 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type', 'content-type': 'application/json' };
+      if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+      if (req.method !== 'POST') return new Response('{}', { status: 405, headers: cors });
+      const body = await req.json().catch(() => ({}));
+      const user = await checkInitData(body.initData, env.BOT_TOKEN);
+      if (!user || !user.id) return new Response('{"ok":false}', { status: 401, headers: cors });
+      await setDaily(env, user.id, !!body.on, Math.max(-840, Math.min(840, Number(body.tz) || 0)));
       return new Response('{"ok":true}', { headers: cors });
     }
 
@@ -211,7 +304,7 @@ export default {
 
     if (url.pathname === '/setup') {
       const out = {
-        webhook: await api('setWebhook', { url: `${url.origin}/hook`, secret_token: secret, allowed_updates: ['message'], drop_pending_updates: true }),
+        webhook: await api('setWebhook', { url: `${url.origin}/hook`, secret_token: secret, allowed_updates: ['message', 'callback_query'], drop_pending_updates: true }),
         menu: await api('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Учить слова', web_app: { url: env.APP_URL } } }),
         description: await api('setMyDescription', { description: DESCRIPTION }),
         short: await api('setMyShortDescription', { short_description: SHORT }),
@@ -224,6 +317,8 @@ export default {
     if (url.pathname === '/hook' && req.method === 'POST') {
       if (req.headers.get('X-Telegram-Bot-Api-Secret-Token') !== secret) return new Response('forbidden', { status: 403 });
       const update = await req.json().catch(() => null);
+      const cq = update && update.callback_query;
+      if (cq && typeof cq.data === 'string' && cq.data.startsWith('daily:')) { await dailyCallback(env, cq); return new Response('ok'); }
       const msg = update && update.message;
       if (msg && msg.chat) {
         const text = typeof msg.text === 'string' ? msg.text.trim() : '';
@@ -277,6 +372,7 @@ export default {
           reply_markup: openBtn,
           link_preview_options: { is_disabled: true },
         });
+        if (isStart && uid && msg.chat.type === 'private') await offerAfterStart(env, uid).catch((e) => console.error('offer', e.message));
       }
       return new Response('ok');
     }

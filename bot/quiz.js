@@ -55,3 +55,8 @@ var c=null;try{c=localStorage.getItem('c')}catch(e){}
 if(c!==null)show(+c);
 </script>`;
 }
+
+// Запасной текст, если Telegram не принял виджет: перевод скрыт, открывается нажатием
+export function quizFallback(q) {
+  return `Слово дня: ${esc(q.ar)} (${esc(q.tr)})\nПеревод: <tg-spoiler>${esc(q.o[q.a])}</tg-spoiler>`;
+}

@@ -30,3 +30,14 @@ CREATE TABLE IF NOT EXISTS feedback (
   created TEXT NOT NULL,
   PRIMARY KEY (admin_id, admin_msg_id)
 );
+
+-- «Слово дня»: только те, кому бот предлагал подписку или кто её включил
+CREATE TABLE IF NOT EXISTS daily (
+  user_id INTEGER PRIMARY KEY,
+  enabled INTEGER NOT NULL DEFAULT 0, -- 1, если человек согласился получать
+  pending INTEGER NOT NULL DEFAULT 0, -- 1, если предложение ждёт отправки в разовой рассылке
+  tz INTEGER NOT NULL DEFAULT -180,   -- смещение часового пояса (как getTimezoneOffset), по умолчанию Москва
+  local_min INTEGER NOT NULL DEFAULT 540, -- минута суток по местному времени, 540 = 9:00
+  last_day TEXT,                      -- местная дата последнего слова
+  updated TEXT
+);
