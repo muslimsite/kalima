@@ -139,17 +139,79 @@ p { text-wrap: pretty; }
 .time { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .time input { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 600 1.25rem/1 var(--f-text); padding: 0 12px; color-scheme: var(--scheme); }
 
-/* Главный экран: два больших выбора */
-.choices { display: grid; gap: 12px; }
-.choice { position: relative; overflow: hidden; display: grid; gap: 6px; text-align: left; padding: 76px 20px 20px; min-height: 200px; align-content: end; border: 0; border-radius: 24px; }
-.c-words { background: var(--accent); color: var(--accent-ink); }
-.c-hifz { background: var(--ok); color: var(--ok-ink); }
-.choice .c-ar { position: absolute; top: -2px; right: 18px; font: 700 3.6rem/1.4 var(--f-ar); opacity: .3; }
-.choice .c-title { font: 800 clamp(1.9rem, 1.5rem + 1.6vw, 2.4rem)/1 var(--f-head); letter-spacing: -.01em; }
-.choice .c-desc { font-size: var(--s2); }
-.choice .c-stat { font-size: var(--s1); font-weight: 600; margin-top: 4px; opacity: .8; }
-.choice:active { filter: brightness(.94); }
-@media (min-width: 900px) { .choices { grid-template-columns: 1fr 1fr; } }
+/* Главный экран: книжная типографика, живой арабский текст и цель из настроек. */
+.home-screen { max-width: 720px; gap: 22px; padding-top: 28px; }
+.home-screen .top { justify-content: flex-start; }
+.home-screen .logo { font: 700 2.15rem/1.2 "PT Serif", Georgia, serif; color: var(--ink); display: flex; align-items: center; gap: 16px; min-height: 44px; }
+.home-screen .logo::before { content: ""; width: 28px; height: 30px; border: 1px solid var(--accent); border-radius: 50% 50% 4px 4px; box-shadow: inset 0 0 0 4px var(--bg), inset 0 0 0 5px var(--accent); }
+.home { --f-home: "PT Serif", Georgia, serif; display: grid; gap: 16px; }
+.home h1 { font: 400 clamp(1.8rem, 1.45rem + 1.3vw, 2.4rem)/1.2 var(--f-home); letter-spacing: -.025em; margin-bottom: 4px; text-wrap: auto; }
+.choices { display: grid; gap: 14px; }
+.choice { --card-ink: #251c15; --card-line: #ad7846; position: relative; width: 100%; min-width: 0; min-height: 218px; border: 0; border-radius: 24px; color: var(--card-ink); text-align: left; overflow: hidden; }
+.c-words { background: linear-gradient(115deg, #f3ce98, #e8b57c); }
+.c-hifz { --card-ink: #16382a; --card-line: #528b6c; background: linear-gradient(115deg, #b4d8bc, #92c3a8); padding: 22px; display: flex; flex-direction: column; justify-content: space-between; gap: 24px; }
+.choice-main { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; width: 100%; min-height: 232px; padding: 22px; border: 0; border-radius: inherit; background: none; text-align: left; color: inherit; }
+.has-review .choice-main { padding-bottom: 76px; }
+.c-copy { position: relative; z-index: 1; display: grid; gap: 8px; padding-right: 100px; }
+.c-title { display: block; font: 700 clamp(1.7rem, 1.4rem + 1.3vw, 2.15rem)/1.12 var(--f-home); letter-spacing: -.03em; }
+.c-desc { display: block; font-size: .8125rem; line-height: 1.55; }
+.c-subtitle { font-size: .9375rem; font-weight: 500; }
+.c-manuscript { position: absolute; top: 22px; right: 18px; bottom: 22px; width: 84px; border: 1px solid var(--card-line); border-radius: 48% 48% 12px 12px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.c-manuscript::before { content: ""; position: absolute; inset: 5px; border: 1px solid var(--card-line); border-radius: inherit; opacity: .55; }
+.c-manuscript::after { content: ""; position: absolute; width: 9px; height: 9px; background: var(--card-line); transform: rotate(45deg); top: 16px; opacity: .6; }
+.c-manuscript [lang="ar"] { position: relative; font: 700 2.5rem/2 var(--f-ar); direction: rtl; padding: 16px 4px; }
+.c-footer { position: relative; z-index: 1; display: flex; align-items: end; gap: 16px; width: 100%; }
+.c-stat { display: block; font-size: .75rem; line-height: 1.5; font-weight: 500; }
+.c-arrow { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--card-ink); color: #f5f1e7; margin-left: auto; }
+.c-arrow svg { width: 22px; height: 22px; }
+.c-review { position: absolute; z-index: 2; bottom: 22px; left: 22px; max-width: calc(100% - 134px); min-height: 42px; padding: 8px 14px; border: 0; border-radius: 24px; background: #51301b; color: #fff3df; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .8125rem; font-weight: 500; text-align: left; }
+.c-review span { flex: none; width: 18px; height: 18px; }
+.c-review svg { width: 100%; height: 100%; }
+.c-progress { width: calc(100% - 60px); display: grid; gap: 9px; }
+.c-hifz .c-manuscript { bottom: 70px; }
+.c-segments { display: flex; gap: 5px; height: 5px; }
+.c-segments > span { flex: 1; min-width: 0; border-radius: 4px; background: rgb(22 56 42 / .17); }
+.c-segments > .done { background: var(--card-ink); }
+.home-quran { display: flex; align-items: center; gap: 16px; width: 100%; padding: 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--raise); color: var(--ink); text-align: left; }
+.home-book { display: flex; flex: none; align-items: center; width: 42px; padding-right: 14px; border-right: 1px solid var(--line); color: var(--accent); }
+.home-book svg { width: 28px; height: 32px; flex: none; stroke-width: 1.3; }
+.home-row-title { display: block; font: 400 1.125rem/1.35 var(--f-home); }
+.home .sub { display: block; color: var(--muted); font-size: .75rem; line-height: 1.6; margin-top: 4px; }
+.home-chevron { width: 18px; height: 22px; flex: none; margin-left: auto; color: var(--muted); }
+.home-chevron svg { width: 100%; height: 100%; }
+.home-options { margin-top: 8px; border-top: 1px solid var(--line); }
+.home-options > button { display: flex; align-items: center; gap: 14px; min-height: 80px; width: 100%; padding: 16px 4px; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; }
+.home-options > button > span:not([class]) { min-width: 0; }
+.home-options .home-row-title { font-size: 1rem; }
+.home-option-icon { display: flex; flex: none; width: 24px; color: var(--muted); }
+.home-option-icon svg { width: 24px; height: 24px; stroke-width: 1.4; }
+.home-switch { flex: none; margin-left: auto; width: 42px; height: 26px; padding: 3px; border-radius: 20px; background: var(--line); transition: background .2s; }
+.home-switch::after { content: ""; display: block; height: 20px; width: 20px; border-radius: 50%; background: var(--ink); transition: transform .2s; }
+.home-switch.on { background: var(--accent); }
+.home-switch.on::after { transform: translateX(16px); background: var(--accent-ink); }
+.choice-main:focus-visible { outline-offset: -4px; outline-color: var(--card-ink); }
+.c-hifz:focus-visible, .c-review:focus-visible { outline-color: var(--ink); }
+.choice-main:active, .c-hifz:active, .c-review:active, .home-quran:active { filter: brightness(.95); }
+@media (hover: hover) { .choice-main:hover, .c-hifz:hover, .home-quran:hover { filter: brightness(1.035); } }
+@media (min-width: 600px) {
+  .home-screen { padding: 40px 32px 64px; gap: 28px; }
+  .home { gap: 20px; }
+  .choice-main, .c-hifz { padding-left: 28px; padding-right: 28px; }
+  .c-copy { padding-right: 160px; }
+  .c-manuscript { width: 130px; right: 24px; }
+  .c-manuscript [lang="ar"] { font-size: 3rem; }
+  .c-review { left: 28px; }
+}
+@media (max-width: 359px) {
+  .choice-main, .c-hifz { padding-left: 18px; padding-right: 18px; }
+  .c-copy { padding-right: 76px; }
+  .c-manuscript { width: 64px; right: 14px; }
+  .c-manuscript [lang="ar"] { font-size: 2.1rem; }
+  .c-title { font-size: 1.5rem; }
+  .c-review { left: 18px; max-width: calc(100% - 108px); font-size: .75rem; }
+  .home-quran { padding: 16px; gap: 12px; }
+  .home-book { width: 36px; padding-right: 8px; }
+}
 
 /* Фон и чтец */
 .themes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
