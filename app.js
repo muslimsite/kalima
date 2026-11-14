@@ -19,7 +19,7 @@ let SIDX = [];       // hifz/index.json: все 114 сур        // coverage.js
 let order = [];        // id слов в порядке обучения
 let setOf = {};        // id слова → id набора
 let P = {};            // прогресс: id → [коробка, день повтора]
-let S = { set: null, pin: [], hi: false, h: {}, hd: {}, rep: 3, qari: 'Husary_Muallim_128kbps', goal: 3, rem: { on: false, time: '07:00' }, theme: 'night', tf: 'saadi' }; // выбранный набор, слова «учить следующими»
+let S = { set: null, pin: [], hi: false, h: {}, hd: {}, rep: 3, qari: 'Husary_Muallim_128kbps', goal: 3, rem: { on: false, time: '07:00' }, theme: 'night', tf: 'ibnkathir' }; // выбранный набор, слова «учить следующими»
 let screen = 'home';
 let back = null;
 
@@ -81,50 +81,59 @@ function applyTheme() {
 }
 
 /* ---------- тафсир ---------- */
-// alquran.cloud: ас-Саади (перевод Кулиева), «Аль-Мунтахаб», Абу Адель. Сура грузится целиком один раз:
-// у ас-Саади пояснение стоит в конце группы аятов, в [[двойных скобках]].
+// Ибн Касир: QUL/Tarteel, фиксированная версия открытого набора spa5k/tafsir_api.
+// Остальные переводы загружаются из alquran.cloud. Текст сохраняется без пересказа.
 const TAFSIR = [
-  ['saadi', 'Ас-Саади', 'ru.kuliev-alsaadi', 'Тафсир Абдуррахмана ас-Саади, перевод Эльмира Кулиева'],
+  ['ibnkathir', 'Ибн Касир', 'ru-tafsir-ibne-kahtir', 'Ибн Касир, русский перевод. Источник: QUL / Tarteel'],
   ['muntahab', 'Аль-Мунтахаб', 'ru.muntahab', 'Тафсир «Аль-Мунтахаб», университет аль-Азхар'],
   ['abuadel', 'Абу Адель', 'ru.abuadel', 'Перевод смыслов Абу Аделя, пояснения в скобках'],
 ];
+const TAFSIR_DATA_URL = 'https://cdn.jsdelivr.net/gh/spa5k/tafsir_api@eb82bb6294efe30ad5c135c03b1864afaa70e855/tafsir/';
 const tfCache = {};
-async function tfSura(n) {
-  if (!tfCache[n]) tfCache[n] = fetch(`https://api.alquran.cloud/v1/surah/${n}/editions/${TAFSIR.map((x) => x[2]).join(',')}`)
-    .then((r) => r.json()).then((j) => { if (j.code !== 200) throw 0; return Object.fromEntries(j.data.map((e) => [e.edition.identifier, e.ayahs.map((a) => a.text)])); })
-    .catch((e) => { delete tfCache[n]; throw e; });
-  return tfCache[n];
+async function tfSura(n, key = 'ibnkathir') {
+  const edition = TAFSIR.find((x) => x[0] === key)[2];
+  const cacheKey = `${edition}:${n}`;
+  if (!tfCache[cacheKey]) {
+    const url = key === 'ibnkathir' ? `${TAFSIR_DATA_URL}${edition}/${n}.json` : `https://api.alquran.cloud/v1/surah/${n}/${edition}`;
+    tfCache[cacheKey] = fetch(url).then((r) => { if (!r.ok) throw new Error('tafsir'); return r.json(); })
+      .then((j) => {
+        if (key === 'ibnkathir') {
+          if (!Array.isArray(j) || !j.length || j.some((row) => +row.surah !== +n || !Number.isInteger(row.ayah) || row.ayah < 1 || typeof row.text !== 'string')) throw new Error('tafsir');
+          const texts = [];
+          j.forEach((row) => { texts[row.ayah - 1] = row.text; });
+          return { [edition]: texts };
+        }
+        if (j.code !== 200 || !Array.isArray(j.data && j.data.ayahs)) throw new Error('tafsir');
+        return { [edition]: j.data.ayahs.map((ayah) => ayah.text) };
+      })
+      .catch((e) => { delete tfCache[cacheKey]; throw e; });
+  }
+  return tfCache[cacheKey];
 }
 const paras = (t) => esc(t).split(/\n+/).filter(Boolean).map((x) => `<p>${x}</p>`).join('');
 function tfBody(ed, key, a) {
   const list = ed[TAFSIR.find((x) => x[0] === key)[2]] || [];
-  if (key !== 'saadi') {
-    const t = list[a - 1] || '';
-    const i = t.indexOf('[[');
-    return i < 0 ? paras(t) : paras(t.slice(0, i)) + `<p class="note">${esc(t.slice(i + 2).replace(/\]\]\s*$/, ''))}</p>`;
-  }
-  // ас-Саади: ищем пояснение в этом аяте или в следующих (оно дано к группе аятов)
-  let j = a - 1; while (j < list.length && !list[j].includes('[[')) j++;
-  if (j >= list.length) return '<p class="muted">К этому аяту отдельного пояснения нет.</p>';
-  let k = a - 1; while (k > 0 && !list[k - 1].includes('[[')) k--;
-  const t = list[j], c = t.slice(t.indexOf('[[') + 2).replace(/\]\]\s*$/, '');
-  return (j > k ? `<p class="note">Пояснение к аятам ${k + 1}–${j + 1}</p>` : '') + paras(c);
+  const t = list[a - 1] || '';
+  if (!t) return '<p class="muted">К этому аяту отдельного пояснения нет.</p>';
+  const i = t.indexOf('[[');
+  return i < 0 ? paras(t) : paras(t.slice(0, i)) + `<p class="note">${esc(t.slice(i + 2).replace(/\]\]\s*$/, ''))}</p>`;
 }
 async function openTafsir(n, a) {
-  const key = TAFSIR.some((x) => x[0] === S.tf) ? S.tf : 'saadi';
+  const key = TAFSIR.some((x) => x[0] === S.tf) ? S.tf : 'ibnkathir';
   const tf = TAFSIR.find((x) => x[0] === key);
   $sheet.hidden = false;
-  const frame = (body) => `<div class="sheet-wrap" data-act="close"><div class="sheet long" role="dialog" aria-label="Тафсир">
+  const frame = (body) => `<div class="sheet-wrap" data-act="close"><div class="sheet long" role="dialog" aria-label="Тафсир" data-tafsir="${n}:${a}:${key}">
     <h3>Тафсир: «${esc(suraName(n))}», аят ${a}</h3>
     <div class="tabs" role="group" aria-label="Какой тафсир">${TAFSIR.map((x) => `<button data-act="tf" data-k="${x[0]}" data-n="${n}" data-a="${a}" class="${x[0] === key ? 'on' : ''}">${x[1]}</button>`).join('')}</div>
-    <p class="note">${esc(tf[3])}</p>
+    <p class="note">${esc(tf[3])}${key === 'ibnkathir' ? ' · <a href="https://qul.tarteel.ai/resources/tafsir/307" target="_blank" rel="noopener">Об источнике</a>' : ''}</p>
     <div class="tafsir">${body}</div>
     <button class="btn" data-act="share" data-n="${n}" data-a="${a}">${PIC}Сделать картинку для статуса</button>
     <button class="btn ghost" data-act="close">Закрыть</button>
   </div></div>`;
   $sheet.innerHTML = frame('<p class="muted">Загружаем тафсир…</p>');
-  try { const ed = await tfSura(n); if (!$sheet.hidden) $sheet.innerHTML = frame(tfBody(ed, key, a)); }
-  catch (e) { if (!$sheet.hidden) $sheet.innerHTML = frame('<p class="muted">Не получилось загрузить тафсир. Проверьте интернет и попробуйте ещё раз.</p>'); }
+  const isCurrent = () => !$sheet.hidden && $sheet.querySelector(`[data-tafsir="${n}:${a}:${key}"]`);
+  try { const ed = await tfSura(n, key); if (isCurrent()) $sheet.innerHTML = frame(tfBody(ed, key, a)); }
+  catch (e) { if (isCurrent()) $sheet.innerHTML = frame('<p class="muted">Не получилось загрузить тафсир. Проверьте интернет и попробуйте ещё раз.</p>'); }
 }
 /* ---------- картинка аята для статуса и истории ---------- */
 // Рисуем на canvas 1080×1920 в цветах выбранного фона: аят, смысл, отрывок тафсира и подпись бота с QR-кодом.
@@ -159,8 +168,9 @@ function wrapLines(ctx, text, maxW) {
 async function drawShare(n, a, withTafsir) {
   const css = getComputedStyle(document.documentElement);
   const v = (k) => css.getPropertyValue(k).trim();
-  await Promise.all(['700 64px Amiri', '400 40px Commissioner', '600 40px Commissioner', '800 60px "Sofia Sans Condensed"'].map((f) => document.fonts.load(f).catch(() => {})));
-  const [sd, ed, qr] = await Promise.all([hzSura(n), withTafsir ? tfSura(n) : null, loadQr().catch(() => null)]);
+  await Promise.all(['700 64px Amiri', '400 40px Commissioner', '600 40px Commissioner', '700 60px "STIX Two Text"'].map((f) => document.fonts.load(f).catch(() => {})));
+  const key = S.tf === 'muntahab' ? 'muntahab' : 'ibnkathir';
+  const [sd, ed, qr] = await Promise.all([hzSura(n), withTafsir ? tfSura(n, key) : null, loadQr().catch(() => null)]);
   const ay = sd.ayahs.find((x) => x.n === a);
   const W = 1080, H = 1920, PAD = 96, MW = W - PAD * 2;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -206,7 +216,6 @@ async function drawShare(n, a, withTafsir) {
 
   // Отрывок тафсира: сколько поместится, в конце «…»
   if (withTafsir && ed) {
-    const key = S.tf === 'muntahab' ? 'muntahab' : 'saadi'; // Абу Адель — перевод, на картинку берём тафсир
     const txt = tfPlain(ed, key, a);
     const room = H - FOOT - 60 - y - 70;
     if (txt && room > 120) {
@@ -241,7 +250,7 @@ async function drawShare(n, a, withTafsir) {
   }
   const tx = PAD + (qr ? box + 56 : 40);
   ctx.textAlign = 'left';
-  ctx.fillStyle = v('--accent'); ctx.font = '800 64px "Sofia Sans Condensed"'; ctx.fillText('Калима', tx, fy + 92);
+  ctx.fillStyle = v('--accent'); ctx.font = '700 64px "STIX Two Text"'; ctx.fillText('Калима', tx, fy + 92);
   ctx.fillStyle = v('--ink'); ctx.font = '400 32px Commissioner'; ctx.fillText('Тренажёр слов Корана', tx, fy + 142);
   ctx.fillStyle = v('--muted'); ctx.font = '600 34px Commissioner'; ctx.fillText('@' + BOT + ' в Telegram', tx, fy + 192);
   return c;
@@ -664,7 +673,12 @@ function answer(i) {
   const ok = L.opts[i] === right;
   btns.forEach((b, j) => { if (L.opts[j] === right) b.classList.add('ok'); else if (j === i) b.classList.add('bad'); });
   haptic(ok ? 'ok' : 'bad');
-  if (ok) { L.qi++; setTimeout(drawTest, 650); return; }
+  if (ok) {
+    const activeLesson = L;
+    L.qi++;
+    setTimeout(() => { if (screen === 'lesson' && L === activeLesson) drawTest(); }, 650);
+    return;
+  }
   L.failed.add(id);
   L.queue.push(id);
   document.getElementById('after').innerHTML = `<div class="stack"><p class="note">«${esc(w.translit)}»: ${esc(w.ru)}. Слово вернётся в конце урока.</p><button class="btn" data-act="next-q">Дальше</button></div>`;
@@ -1055,7 +1069,7 @@ function toc() {
       const k = s.words.filter((id) => P[id]).length;
       return `<button data-go="sura" data-n="${s.sura ?? ''}" data-set="${esc(s.id)}"><span>${s.sura ? s.sura + '. ' : ''}${esc(s.title)}<span class="sub">${k} из ${s.words.length} ${plural(s.words.length, 'слова', 'слов', 'слов')}${s.id === S.set ? ', учите сейчас' : ''}</span></span><b>${s.words.length ? Math.round((k / s.words.length) * 100) : 0}%</b></button>`;
     }).join('')}</div>
-    <p class="credits">${[].concat(m.attribution || [], 'Озвучка слов: Quran.com. Чтение аятов: everyayah.com, чтец выбирается в разделе «Фон и чтец».', 'Тафсиры: ас-Саади (перевод Э. Кулиева), «Аль-Мунтахаб», перевод Абу Аделя, через alquran.cloud.').map(esc).join('<br>')}</p>
+    <p class="credits">${[].concat(m.attribution || [], 'Озвучка слов: Quran.com. Чтение аятов: everyayah.com, чтец выбирается в разделе «Фон и чтец».', 'Тафсир Ибн Касира: QUL / Tarteel, открытый набор spa5k/tafsir_api. «Аль-Мунтахаб» и перевод Абу Аделя: alquran.cloud.').map(esc).join('<br>')}</p>
   </div>`;
 }
 
@@ -1181,7 +1195,7 @@ document.addEventListener('click', (e) => {
   }
   D.sets.forEach((s) => s.words.forEach((id) => { if (!setOf[id] && D.words[id]) { setOf[id] = s.id; order.push(id); } }));
   S.set = D.sets[0].id;
-  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi, h: b.s.h || {}, rep: b.s.rep || 3, qari: b.s.qari || 'Husary_Muallim_128kbps', hd: b.s.hd || {}, goal: b.s.goal || 3, rem: b.s.rem || { on: false, time: '07:00' }, last: b.s.last || [], theme: b.s.theme || 'night', tf: b.s.tf || 'saadi', rd: b.s.rd || null, tr: b.s.tr, fs: b.s.fs || 1 }; applyTheme(); };
+  const apply = (b) => { if (!b) return; P = unpack(b.p); if (b.s) S = { set: b.s.set || S.set, pin: b.s.pin || [], hi: !!b.s.hi, h: b.s.h || {}, rep: b.s.rep || 3, qari: b.s.qari || 'Husary_Muallim_128kbps', hd: b.s.hd || {}, goal: b.s.goal || 3, rem: b.s.rem || { on: false, time: '07:00' }, last: b.s.last || [], theme: b.s.theme || 'night', tf: TAFSIR.some((x) => x[0] === b.s.tf) ? b.s.tf : 'ibnkathir', rd: b.s.rd || null, tr: b.s.tr, fs: b.s.fs || 1 }; applyTheme(); };
   const local = loadLocal();
   apply(local);
   applyTheme();
