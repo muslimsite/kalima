@@ -469,6 +469,8 @@ function welcome() {
 
 /* ---------- главная ---------- */
 const HOME_ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
+const HOME_CALENDAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-14 4h.01M12 15h.01M17 15h.01M7 18h.01M12 18h.01"/></svg>';
+const HOME_PHONE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>';
 const HOME_CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>';
 
 function home() {
@@ -481,16 +483,15 @@ function home() {
   $view.innerHTML = `<div class="home">
     <h1>Чем займёмся?</h1>
     <div class="choices">
-      <article class="choice c-words ${dl ? 'has-review' : ''}">
+      <article class="choice c-words">
         <button class="choice-main" data-go="words">
           <span class="c-copy">
             <span class="c-title">Учить слова<br>Корана</span>
-            <span class="c-desc">10 слов за урок<br>Карточки и тест</span>
+            <span class="c-desc">10 слов за урок · карточки и тест</span>
           </span>
           <span class="c-manuscript" aria-hidden="true"><span lang="ar">كَلِمَة</span></span>
-          ${!dl ? `<span class="c-footer"><span class="c-stat">${wordsSub}</span><span class="c-arrow">${HOME_ARROW}</span></span>` : ''}
         </button>
-        ${dl ? `<button class="c-review" data-act="review">Повторить ${dl} ${plural(dl, 'слово', 'слова', 'слов')}<span>${HOME_ARROW}</span></button>` : ''}
+        ${dl ? `<button class="c-review" data-act="review">Повторить ${dl} ${plural(dl, 'слово', 'слова', 'слов')}<span>${HOME_ARROW}</span></button>` : nw ? `<button class="c-review" data-act="learn">Начать урок<span>${HOME_ARROW}</span></button>` : `<span class="c-complete">${wordsSub}</span>`}
       </article>
       <button class="choice c-hifz" data-go="hifzToc">
         <span class="c-copy">
@@ -513,8 +514,8 @@ function home() {
       <span class="home-chevron">${HOME_CHEVRON}</span>
     </button>
     <nav class="home-options" aria-label="Настройки">
-      ${DAILY !== null && !S.rem.on ? `<button data-act="daily" aria-pressed="${DAILY}"><span class="home-option-icon">${BELL}</span><span><span class="home-row-title">Слово дня</span><span class="sub">Мини-тест каждый день в 9:00</span></span><span class="home-switch ${DAILY ? 'on' : ''}" aria-hidden="true"></span></button>` : ''}
-      ${HOME_OK ? `<button data-act="homescreen"><span><span class="home-row-title">Добавить на экран телефона</span><span class="sub">«Калима» всегда под рукой</span></span><span class="home-chevron">${HOME_CHEVRON}</span></button>` : ''}
+      ${DAILY !== null && !S.rem.on ? `<button data-act="daily" aria-pressed="${DAILY}"><span class="home-option-icon">${HOME_CALENDAR}</span><span><span class="home-row-title">Слово дня</span><span class="sub">Мини-тест каждый день в 9:00</span></span><span class="home-switch ${DAILY ? 'on' : ''}" aria-hidden="true"></span></button>` : ''}
+      ${HOME_OK ? `<button data-act="homescreen"><span class="home-option-icon">${HOME_PHONE}</span><span><span class="home-row-title">Добавить на экран телефона</span><span class="sub">«Калима» всегда под рукой</span></span><span class="home-chevron">${HOME_CHEVRON}</span></button>` : ''}
       <button data-go="settings"><span><span class="home-row-title">Фон и чтец</span><span class="sub">${esc((THEMES.find((x) => x[0] === S.theme) || THEMES[0])[1])} · ${esc(qariName())}</span></span><span class="home-chevron">${HOME_CHEVRON}</span></button>
     </nav>
   </div>`;
