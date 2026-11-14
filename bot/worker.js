@@ -2,7 +2,7 @@
 // /start → приветствие с кнопкой, которая открывает мини-приложение.
 // /setup → один раз подключает вебхук, кнопку меню и описание бота.
 
-import { pickQuiz, quizHtml, quizFallback } from './quiz.js';
+import { pickQuiz, quizText, quizRows, QUESTION } from './quiz.js';
 
 const CHANNEL = 'https://t.me/+K04B4CsLj8E1OTc6';
 const HELLO =
@@ -99,20 +99,49 @@ function remindMarkup(env) {
   return { inline_keyboard: [[{ text: 'Открыть хифз', web_app: { url: env.APP_URL + '#hifz' } }]] };
 }
 
-// Напоминание с мини-тестом внутри. Если Telegram не принял виджет, уходит обычное сообщение с той же кнопкой.
+// Человек недоступен: остановил бота или удалил аккаунт. Таким больше не пишем.
+const gone = (res) => res.error_code === 403 || (res.error_code === 400 && /chat not found|deactivated/i.test(res.description || ''));
+
+// Напоминание с тестом «Слово дня» на кнопках
 async function sendReminder(env, chatId, goal, learned, tz) {
-  const text = reminderText(goal, learned), reply_markup = remindMarkup(env);
   const day = Math.floor((Date.now() - tz * 60000) / 86400000);
-  const res = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(pickQuiz(chatId, day)), allow_queries: true, caption: text, reply_markup });
-  if (res.ok || res.error_code === 403) return res;
-  console.error('sendWidget', res.error_code, res.description);
-  return tgApi(env, 'sendMessage', { chat_id: chatId, text, reply_markup });
+  return sendQuiz(env, chatId, pickQuiz(chatId, day), reminderText(goal, learned), remindMarkup(env));
+}
+async function sendQuiz(env, chatId, q, text, markup) {
+  const res = await tgApi(env, 'sendMessage', {
+    chat_id: chatId, text: quizText(q) + '\n\n' + text, parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [...quizRows(q), ...markup.inline_keyboard] },
+  });
+  if (!res.ok) console.error('quiz', res.error_code, res.description);
+  return res;
+}
+// Ответ на тест: строка вопроса меняется на результат, кнопки вариантов убираются, остальные кнопки остаются
+async function quizCallback(env, cq) {
+  const answer = (text) => tgApi(env, 'answerCallbackQuery', { callback_query_id: cq.id, text });
+  const [c, a] = cq.data.split(':').slice(1).map(Number);
+  const m = cq.message;
+  if (!m || !(a >= 0 && a <= 2)) return answer('');
+  const rows = (m.reply_markup && m.reply_markup.inline_keyboard) || [];
+  const isQuiz = (r) => r.some((b) => String(b.callback_data || '').startsWith('qz:'));
+  const quiz = rows.filter(isQuiz), right = quiz[a] ? quiz[a][0].text : '';
+  const ok = c === a;
+  await env.DB.prepare("INSERT OR IGNORE INTO quiz_answers (user_id, message_id, day, correct) VALUES (?1, ?2, date('now'), ?3)").bind(cq.from.id, m.message_id, ok ? 1 : 0).run().catch((e) => console.error('quiz', e.message));
+  await env.DB.prepare("DELETE FROM quiz_answers WHERE day < date('now', '-30 days')").run().catch(() => {});
+  const text = m.text || '', i = text.indexOf(QUESTION);
+  const line = ok ? `Верно, машаАллах! Это «${right}».` : `Правильный ответ: «${right}».`;
+  await tgApi(env, 'editMessageText', {
+    chat_id: m.chat.id, message_id: m.message_id,
+    text: i < 0 ? text + '\n\n' + line : text.slice(0, i) + line + text.slice(i + QUESTION.length),
+    entities: (m.entities || []).filter((e) => i < 0 || e.offset + e.length <= i),
+    reply_markup: { inline_keyboard: rows.filter((r) => !isQuiz(r)) },
+  });
+  return answer(ok ? 'Верно!' : 'Неверно');
 }
 
 /* ---------- «Слово дня» ---------- */
-const OFFER = 'Это слово дня: одно слово из Корана и перевод на выбор. Присылать такое каждый день в 9:00 по Москве?';
+const OFFER = 'Такое слово с выбором перевода бот может присылать каждый день в 9:00 по Москве. Присылать?';
 const OFFER_ALL = 'Ассаляму алейкум!\n\n' + OFFER;
-const DAILY_TEXT = 'Слово дня из Корана. Учить дальше можно в тренажёре.';
+const DAILY_TEXT = 'Учить слова дальше можно в тренажёре.';
 const SEND_LIMIT = 20; // за один запуск по расписанию: у бесплатного Cloudflare ограничено число запросов
 const localMod = "(-tz) || ' minutes'";
 const offerKeys = { inline_keyboard: [[{ text: 'Присылать каждый день', callback_data: 'daily:on' }, { text: 'Не надо', callback_data: 'daily:no' }]] };
@@ -122,13 +151,7 @@ const dailyKeys = (env) => ({ inline_keyboard: [[{ text: BUTTON, web_app: { url:
 const dayNum = (tz) => Math.floor((Date.now() - tz * 60000) / 86400000);
 const localDay = (tz) => new Date(Date.now() - tz * 60000).toISOString().slice(0, 10);
 
-async function sendWord(env, chatId, tz, caption, reply_markup) {
-  const q = pickQuiz(chatId, dayNum(tz));
-  const res = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(q), allow_queries: true, caption, reply_markup });
-  if (res.ok || res.error_code === 403) return res;
-  console.error('sendWidget', res.error_code, res.description);
-  return tgApi(env, 'sendMessage', { chat_id: chatId, text: quizFallback(q) + '\n\n' + caption, parse_mode: 'HTML', reply_markup });
-}
+const sendWord = (env, chatId, tz, text, markup) => sendQuiz(env, chatId, pickQuiz(chatId, dayNum(tz)), text, markup);
 // Включает или выключает подписку. Сегодняшний день считается закрытым: человек только что видел слово.
 async function setDaily(env, id, on, tz) {
   const hasTz = Number.isFinite(tz);
@@ -149,7 +172,9 @@ async function offerAfterStart(env, id) {
 }
 async function dailyCallback(env, cq) {
   const answer = (text) => tgApi(env, 'answerCallbackQuery', { callback_query_id: cq.id, text });
-  const keys = (reply_markup) => cq.message ? tgApi(env, 'editMessageReplyMarkup', { chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup }) : null;
+  // Неотвеченный тест в этом же сообщении не трогаем, меняем только кнопки подписки
+  const quizKept = ((cq.message && cq.message.reply_markup && cq.message.reply_markup.inline_keyboard) || []).filter((r) => r.some((b) => String(b.callback_data || '').startsWith('qz:')));
+  const keys = (reply_markup) => cq.message ? tgApi(env, 'editMessageReplyMarkup', { chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [...quizKept, ...reply_markup.inline_keyboard] } }) : null;
   const a = cq.data.split(':')[1];
   if (a === 'on') {
     await setDaily(env, cq.from.id, true);
@@ -182,7 +207,7 @@ async function dailyRun(env, limit) {
   for (const d of due || []) {
     const res = await sendWord(env, d.user_id, d.tz, DAILY_TEXT, dailyKeys(env));
     if (res.ok) await env.DB.prepare('UPDATE daily SET last_day = ?1 WHERE user_id = ?2').bind(localDay(d.tz), d.user_id).run();
-    else if (res.error_code === 403) await env.DB.prepare('UPDATE daily SET enabled = 0 WHERE user_id = ?1').bind(d.user_id).run();
+    else if (gone(res)) await env.DB.prepare('UPDATE daily SET enabled = 0 WHERE user_id = ?1').bind(d.user_id).run();
   }
   const left = limit - (due || []).length;
   if (left <= 0) return;
@@ -207,7 +232,7 @@ export default {
       const res = await sendReminder(env, r.user_id, r.goal, r.learned, r.tz);
       sent++;
       if (res.ok) await env.DB.prepare('UPDATE reminders SET last_day = ?1 WHERE user_id = ?2').bind(day, r.user_id).run();
-      else if (res.error_code === 403) await env.DB.prepare('UPDATE reminders SET enabled = 0 WHERE user_id = ?1').bind(r.user_id).run();
+      else if (gone(res)) await env.DB.prepare('UPDATE reminders SET enabled = 0 WHERE user_id = ?1').bind(r.user_id).run();
     }
     await dailyRun(env, SEND_LIMIT - sent);
   },
@@ -335,6 +360,7 @@ export default {
       if (wq) { await quizAnswer(env, wq); return new Response('ok'); }
       const cq = update && update.callback_query;
       if (cq && typeof cq.data === 'string' && cq.data.startsWith('daily:')) { await dailyCallback(env, cq); return new Response('ok'); }
+      if (cq && typeof cq.data === 'string' && cq.data.startsWith('qz:')) { await quizCallback(env, cq); return new Response('ok'); }
       const msg = update && update.message;
       if (msg && msg.chat) {
         const text = typeof msg.text === 'string' ? msg.text.trim() : '';
