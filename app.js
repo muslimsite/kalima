@@ -447,6 +447,7 @@ function whenLabel(id) {
 /* ---------- навигация ---------- */
 function go(name, arg) {
   screen = name;
+  document.querySelector('.app').classList.toggle('home-screen', name === 'home');
   back = null;
   closeSheet();
   window.scrollTo(0, 0);
@@ -467,34 +468,54 @@ function welcome() {
 }
 
 /* ---------- главная ---------- */
+const HOME_ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
+const HOME_CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>';
+
 function home() {
   $where.textContent = '';
   const dl = due().length;
   const nw = nextNew(1)[0];
   const t = S.hd[today()] || 0, g = S.goal;
-  const wordsSub = dl ? `${dl} ${plural(dl, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения` : nw ? `Следующее слово «${esc(W(nw).translit)}»` : 'Все слова выучены';
-  const hifzSub = hifzDone() ? `Сегодня ${t} из ${g} ${plural(g, 'аята', 'аятов', 'аятов')}` : 'Начните с «Аль-Фатихи»';
-  $view.innerHTML = `<div class="narrow stack">
-    <h1>Что будем делать сегодня?</h1>
+  const wordsSub = dl ? '' : nw ? `Следующее слово «${esc(W(nw).translit)}»` : 'Все слова выучены';
+  const hifzSub = `Сегодня ${t} из ${g} ${plural(g, 'аята', 'аятов', 'аятов')}`;
+  $view.innerHTML = `<div class="home">
+    <h1>Чем займёмся?</h1>
     <div class="choices">
-      <button class="choice c-words" data-go="words">
-        <span class="c-ar" lang="ar" aria-hidden="true">كَلِمَة</span>
-        <span class="c-title">Учить слова Корана</span>
-        <span class="c-desc">Урок из 10 слов: карточки, тест и повторение</span>
-        <span class="c-stat">${wordsSub}</span>
-      </button>
+      <article class="choice c-words ${dl ? 'has-review' : ''}">
+        <button class="choice-main" data-go="words">
+          <span class="c-copy">
+            <span class="c-title">Учить слова<br>Корана</span>
+            <span class="c-desc">10 слов за урок<br>Карточки и тест</span>
+          </span>
+          <span class="c-manuscript" aria-hidden="true"><span lang="ar">كَلِمَة</span></span>
+          ${!dl ? `<span class="c-footer"><span class="c-stat">${wordsSub}</span><span class="c-arrow">${HOME_ARROW}</span></span>` : ''}
+        </button>
+        ${dl ? `<button class="c-review" data-act="review">Повторить ${dl} ${plural(dl, 'слово', 'слова', 'слов')}<span>${HOME_ARROW}</span></button>` : ''}
+      </article>
       <button class="choice c-hifz" data-go="hifzToc">
-        <span class="c-ar" lang="ar" aria-hidden="true">حِفْظ</span>
-        <span class="c-title">Хифз: учить наизусть</span>
-        <span class="c-desc">Суры по аятам, чтец на выбор, тафсир к каждому аяту</span>
-        <span class="c-stat">${hifzSub}</span>
+        <span class="c-copy">
+          <span class="c-title">Хифз</span>
+          <span class="c-desc c-subtitle">Учить суры по аятам</span>
+          <span class="c-desc">Чтец на выбор · тафсир</span>
+        </span>
+        <span class="c-manuscript" aria-hidden="true"><span lang="ar">حِفْظ</span></span>
+        <span class="c-footer">
+          <span class="c-progress"><span class="c-stat">${hifzSub}</span>
+            <span class="c-segments" role="progressbar" aria-label="Дневная цель хифза" aria-valuemin="0" aria-valuemax="${g}" aria-valuenow="${Math.min(t, g)}" aria-valuetext="${hifzSub}">${Array.from({ length: g }, (_, i) => `<span class="${i < t ? 'done' : ''}"></span>`).join('')}</span>
+          </span>
+          <span class="c-arrow">${HOME_ARROW}</span>
+        </span>
       </button>
     </div>
-    <nav class="list" aria-label="Ещё">
-      <button data-go="quran"><span>Читать Коран<span class="sub">Все 114 сур целиком, можно слушать подряд</span></span></button>
-      ${HOME_OK ? `<button data-act="homescreen"><span>Добавить на экран телефона<span class="sub">Значок «Калимы» рядом с другими приложениями</span></span></button>` : ''}
-      ${DAILY !== null && !S.rem.on ? `<button data-act="daily" class="${DAILY ? 'on' : ''}" aria-pressed="${DAILY}"><span>Слово дня от бота<span class="sub">Каждый день в 9:00 с мини-тестом</span></span><span class="tick">${DAILY ? TICK : ''}</span></button>` : ''}
-      <button data-go="settings"><span>Фон и чтец<span class="sub">${esc((THEMES.find((x) => x[0] === S.theme) || THEMES[0])[1])}, ${esc(qariName())}</span></span></button>
+    <button class="home-quran" data-go="quran">
+      <span class="home-book">${BOOK}</span>
+      <span><span class="home-row-title">Читать Коран</span><span class="sub">Все 114 сур · чтение и аудио</span></span>
+      <span class="home-chevron">${HOME_CHEVRON}</span>
+    </button>
+    <nav class="home-options" aria-label="Настройки">
+      ${DAILY !== null && !S.rem.on ? `<button data-act="daily" aria-pressed="${DAILY}"><span class="home-option-icon">${BELL}</span><span><span class="home-row-title">Слово дня</span><span class="sub">Мини-тест каждый день в 9:00</span></span><span class="home-switch ${DAILY ? 'on' : ''}" aria-hidden="true"></span></button>` : ''}
+      ${HOME_OK ? `<button data-act="homescreen"><span><span class="home-row-title">Добавить на экран телефона</span><span class="sub">«Калима» всегда под рукой</span></span><span class="home-chevron">${HOME_CHEVRON}</span></button>` : ''}
+      <button data-go="settings"><span><span class="home-row-title">Фон и чтец</span><span class="sub">${esc((THEMES.find((x) => x[0] === S.theme) || THEMES[0])[1])} · ${esc(qariName())}</span></span><span class="home-chevron">${HOME_CHEVRON}</span></button>
     </nav>
   </div>`;
 }
