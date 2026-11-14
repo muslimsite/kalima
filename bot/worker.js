@@ -2,7 +2,7 @@
 // /start → приветствие с кнопкой, которая открывает мини-приложение.
 // /setup → один раз подключает вебхук, кнопку меню и описание бота.
 
-import { pickQuiz, quizText, quizRows, QUESTION } from './quiz.js';
+import { pickQuiz, quizHtml, quizText, quizRows, QUESTION } from './quiz.js';
 
 const CHANNEL = 'https://t.me/+K04B4CsLj8E1OTc6';
 const HELLO =
@@ -107,7 +107,24 @@ async function sendReminder(env, chatId, goal, learned, tz) {
   const day = Math.floor((Date.now() - tz * 60000) / 86400000);
   return sendQuiz(env, chatId, pickQuiz(chatId, day), reminderText(goal, learned), remindMarkup(env));
 }
+// Виджет Telegram с 14.11.2026 отклоняет. Бот пробует его на первом слове за день (по UTC):
+// принят — весь день шлёт виджет, отказ — до конца дня тест на кнопках. Так виджет вернётся сам.
+let widgetOffMemo = 0;
+async function widgetOff(env) {
+  if (Date.now() < widgetOffMemo) return true;
+  const until = Number(await env.IMG.get('widget-off')) || 0;
+  if (until > Date.now()) widgetOffMemo = until;
+  return until > Date.now();
+}
 async function sendQuiz(env, chatId, q, text, markup) {
+  if (!(await widgetOff(env))) {
+    const w = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(q), allow_queries: true, caption: text, reply_markup: markup });
+    if (w.ok || gone(w)) return w;
+    console.error('widget', w.error_code, w.description);
+    const until = (Math.floor(Date.now() / 86400000) + 1) * 86400000;
+    widgetOffMemo = until;
+    await env.IMG.put('widget-off', String(until), { expirationTtl: Math.max(60, Math.ceil((until - Date.now()) / 1000)) });
+  }
   const res = await tgApi(env, 'sendMessage', {
     chat_id: chatId, text: quizText(q) + '\n\n' + text, parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [...quizRows(q), ...markup.inline_keyboard] },
