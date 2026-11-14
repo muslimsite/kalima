@@ -342,3 +342,6 @@ p { text-wrap: pretty; }
 }
 
 .note a { color: var(--accent); text-underline-offset: 3px; }
+
+/* подсказка под кнопкой «Добавить на экран телефона»: на одной линии со строками списка */
+#homeHint { padding: 0 12px; }
