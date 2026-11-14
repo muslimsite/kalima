@@ -107,23 +107,14 @@ async function sendReminder(env, chatId, goal, learned, tz) {
   const day = Math.floor((Date.now() - tz * 60000) / 86400000);
   return sendQuiz(env, chatId, pickQuiz(chatId, day), reminderText(goal, learned), remindMarkup(env));
 }
-// Виджет Telegram с 14.11.2026 отклоняет. Бот пробует его на первом слове за день (по UTC):
-// принят — весь день шлёт виджет, отказ — до конца дня тест на кнопках. Так виджет вернётся сам.
-let widgetOffMemo = 0;
-async function widgetOff(env) {
-  if (Date.now() < widgetOffMemo) return true;
-  const until = Number(await env.IMG.get('widget-off')) || 0;
-  if (until > Date.now()) widgetOffMemo = until;
-  return until > Date.now();
-}
+// Виджет Telegram с 14.11.2026 отклоняет. Пробуем его только на аккаунте автора (таблица admins):
+// если Telegram снова примет, автор увидит виджет в своём слове дня, остальным пока всегда кнопки.
 async function sendQuiz(env, chatId, q, text, markup) {
-  if (!(await widgetOff(env))) {
+  const admin = await env.DB.prepare('SELECT 1 n FROM admins WHERE user_id = ?1').bind(chatId).first('n').catch(() => null);
+  if (admin) {
     const w = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(q), allow_queries: true, caption: text, reply_markup: markup });
     if (w.ok || gone(w)) return w;
     console.error('widget', w.error_code, w.description);
-    const until = (Math.floor(Date.now() / 86400000) + 1) * 86400000;
-    widgetOffMemo = until;
-    await env.IMG.put('widget-off', String(until), { expirationTtl: Math.max(60, Math.ceil((until - Date.now()) / 1000)) });
   }
   const res = await tgApi(env, 'sendMessage', {
     chat_id: chatId, text: quizText(q) + '\n\n' + text, parse_mode: 'HTML',
