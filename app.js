@@ -140,7 +140,7 @@ async function openTafsir(n, a) {
 const BOT = 'Koran_slovo_bot';
 const BOT_URL = 'https://t.me/' + BOT;
 const hzCache = {};
-const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=17`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
+const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=23`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
 let qrLib = null;
 function loadQr() {
   if (window.qrcode) return Promise.resolve(window.qrcode);
@@ -528,6 +528,7 @@ function home() {
       ${DESIGN_PREVIEW || DAILY !== null && !S.rem.on ? `<button data-act="daily" aria-pressed="${DAILY === true}"><span class="home-option-icon">${HOME_CALENDAR}</span><span><span class="home-row-title">Слово дня от бота</span><span class="sub">Каждый день в 9:00 с мини-тестом</span></span><span class="home-switch ${DAILY ? 'on' : ''}" aria-hidden="true"></span></button>` : ''}
       <button data-go="settings"><span><span class="home-row-title">Фон и чтец</span><span class="sub">${esc((THEMES.find((x) => x[0] === S.theme) || THEMES[0])[1])} · ${esc(qariName())}</span></span><span class="home-chevron">${HOME_CHEVRON}</span></button>
     </nav>
+    <p class="note" id="homeHint" hidden></p>
   </div>`;
 }
 
@@ -545,11 +546,19 @@ async function toggleDaily() {
 
 /* ---------- значок на экране телефона (Telegram 8.0+) ---------- */
 let HOME_OK = false;
+// Telegram не сообщает, показал ли он окошко «Добавить». Если значок не добавился за 3 секунды, подсказываем, что проверить.
+const HOME_HINT = 'Если окошко «Добавить» не появилось или значка нет: нажмите ⋮ вверху справа и выберите «Добавить на главный экран». На Xiaomi, Redmi, Poco, Huawei и Honor ещё разрешите Telegram ярлыки: Настройки → Приложения → Telegram → Разрешения → «Ярлыки на рабочем столе». Потом закройте Telegram и попробуйте снова.';
+let homeTimer = 0;
+function addHome() {
+  clearTimeout(homeTimer);
+  try { tg.addToHomeScreen(); } catch (e) {}
+  homeTimer = setTimeout(() => { const el = document.getElementById('homeHint'); if (el && HOME_OK) { el.textContent = HOME_HINT; el.hidden = false; } }, 3000);
+}
 function checkHome() {
   if (!(tg && tg.addToHomeScreen && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))) return;
   try {
     tg.checkHomeScreenStatus((st) => { HOME_OK = st !== 'unsupported' && st !== 'added'; if (screen === 'home') home(); });
-    tg.onEvent('homeScreenAdded', () => { HOME_OK = false; haptic('ok'); if (screen === 'home') home(); });
+    tg.onEvent('homeScreenAdded', () => { clearTimeout(homeTimer); HOME_OK = false; haptic('ok'); if (screen === 'home') home(); });
   } catch (e) {}
 }
 
@@ -884,7 +893,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, i: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=17`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=23`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const firstNew = HZ.data.ayahs.findIndex((a) => !done.includes(a.n));
     HZ.i = firstNew < 0 ? 0 : firstNew;
@@ -1156,7 +1165,8 @@ document.addEventListener('click', (e) => {
   }
   if (a === 'daily') return toggleDaily();
   if (a === 'kjuz' || a === 'ksura') return knownAct(a, t);
-  if (a && a[0] === 'h' && a !== 'hello') return hifzAct(a, t);
+  // Действия хифза начинаются на «h»; «hello» и «homescreen» к хифзу не относятся
+  if (a && a[0] === 'h' && a !== 'hello' && a !== 'homescreen') return hifzAct(a, t);
   if (a === 'hello') { S.hi = true; save(); haptic('ok'); return go('home'); }
   if (a === 'learn') return go('lesson', 'learn');
   if (a === 'review') return go('lesson', 'review');
@@ -1167,7 +1177,7 @@ document.addEventListener('click', (e) => {
   if (a === 'next-q') { L.qi++; return drawTest(); }
   if (a === 'word') { if (t.dataset.url) play(t.dataset.url); return openSheet(t.dataset.id, t.dataset.url); }
   if (a === 'play') { e.stopPropagation(); return play(t.dataset.url, t); }
-  if (a === 'homescreen') { try { tg.addToHomeScreen(); } catch (e) {} return; }
+  if (a === 'homescreen') return addHome();
   if (a === 'theme') { S.theme = t.dataset.k; save(); applyTheme(); haptic(); return settings(); }
   if (a === 'qari') { S.qari = t.dataset.q; save(); haptic(); const keep = back; settings(); back = keep; return play(ayahUrl(1, 2), $view.querySelector(`[data-q="${t.dataset.q}"]`)); }
   if (a === 'share') { e.stopPropagation(); haptic(); return openShare(+t.dataset.n, +t.dataset.a); }
@@ -1185,9 +1195,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=17').then((r) => r.json()),
-      fetch('data/coverage.json?v=17').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=17').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=23').then((r) => r.json()),
+      fetch('data/coverage.json?v=23').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=23').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
