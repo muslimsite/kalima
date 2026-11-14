@@ -6,6 +6,7 @@ const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.i
 const $view = document.getElementById('view');
 const $sheet = document.getElementById('sheet');
 const $where = document.getElementById('where');
+const DESIGN_PREVIEW = document.documentElement.dataset.preview === 'true';
 
 const NEW_PER_LESSON = 10;
 const MAX_REVIEW = 20;
@@ -514,8 +515,8 @@ function home() {
       <span class="home-chevron">${HOME_CHEVRON}</span>
     </button>
     <nav class="home-options" aria-label="Настройки">
-      ${DAILY !== null && !S.rem.on ? `<button data-act="daily" aria-pressed="${DAILY}"><span class="home-option-icon">${HOME_CALENDAR}</span><span><span class="home-row-title">Слово дня</span><span class="sub">Мини-тест каждый день в 9:00</span></span><span class="home-switch ${DAILY ? 'on' : ''}" aria-hidden="true"></span></button>` : ''}
-      ${HOME_OK ? `<button data-act="homescreen"><span class="home-option-icon">${HOME_PHONE}</span><span><span class="home-row-title">Добавить на экран телефона</span><span class="sub">«Калима» всегда под рукой</span></span><span class="home-chevron">${HOME_CHEVRON}</span></button>` : ''}
+      ${HOME_OK || DESIGN_PREVIEW ? `<button data-act="homescreen"><span class="home-option-icon">${HOME_PHONE}</span><span><span class="home-row-title">Добавить на экран телефона</span><span class="sub">Значок «Калимы» рядом с другими приложениями</span></span><span class="home-chevron">${HOME_CHEVRON}</span></button>` : ''}
+      ${DESIGN_PREVIEW || DAILY !== null && !S.rem.on ? `<button data-act="daily" aria-pressed="${DAILY === true}"><span class="home-option-icon">${HOME_CALENDAR}</span><span><span class="home-row-title">Слово дня от бота</span><span class="sub">Каждый день в 9:00 с мини-тестом</span></span><span class="home-switch ${DAILY ? 'on' : ''}" aria-hidden="true"></span></button>` : ''}
       <button data-go="settings"><span><span class="home-row-title">Фон и чтец</span><span class="sub">${esc((THEMES.find((x) => x[0] === S.theme) || THEMES[0])[1])} · ${esc(qariName())}</span></span><span class="home-chevron">${HOME_CHEVRON}</span></button>
     </nav>
   </div>`;
@@ -1129,6 +1130,16 @@ document.addEventListener('click', (e) => {
   if (a0(t) === 'rfs') { S.fs = +t.dataset.f; save(); return drawRead(); }
   const a = t.dataset.act;
   if (a === 'close') { if (e.target === t || t.tagName === 'BUTTON') closeSheet(); return; }
+  if (DESIGN_PREVIEW && (a === 'daily' || a === 'homescreen')) {
+    $sheet.hidden = false;
+    $sheet.innerHTML = `<div class="sheet-wrap" data-act="close"><div class="sheet">
+      <h2>${a === 'daily' ? 'Слово дня от бота' : 'Добавить на экран телефона'}</h2>
+      <p class="note">${a === 'daily' ? 'Ежедневный мини-тест приходит в Telegram. Откройте бота, чтобы настроить подписку.' : 'Добавление значка запускается внутри Telegram. Откройте бота и нажмите эту кнопку в мини-приложении.'}</p>
+      <a class="btn" href="${BOT_URL}" target="_blank" rel="noopener" style="text-decoration:none">Открыть бота в Telegram</a>
+      <button class="btn ghost" data-act="close">Закрыть</button>
+    </div></div>`;
+    return;
+  }
   if (a === 'daily') return toggleDaily();
   if (a === 'kjuz' || a === 'ksura') return knownAct(a, t);
   if (a && a[0] === 'h' && a !== 'hello') return hifzAct(a, t);
