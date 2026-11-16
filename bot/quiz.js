@@ -62,7 +62,7 @@ export function quizFallback(q) {
   return `Слово дня: ${esc(q.ar)} (${esc(q.tr)})\nПеревод: <tg-spoiler>${esc(q.o[q.a])}</tg-spoiler>`;
 }
 
-// Тест на обычных кнопках: работает в любой версии Telegram. Виджет выше Telegram с 14.11.2026 не принимает.
+// Тест на обычных кнопках, если Telegram отклоняет отправку виджета.
 export const QUESTION = 'Что оно значит?';
 export function quizText(q) {
   return `Слово дня: <b>${esc(q.ar)}</b> (${esc(q.tr)})\n${QUESTION}`;
