@@ -107,21 +107,17 @@ async function sendReminder(env, chatId, goal, learned, tz) {
   const day = Math.floor((Date.now() - tz * 60000) / 86400000);
   return sendQuiz(env, chatId, pickQuiz(chatId, day), reminderText(goal, learned), remindMarkup(env));
 }
-// Виджет Telegram с 14.11.2026 отклоняет. Пробуем его только на аккаунте автора (таблица admins):
-// если Telegram снова примет, автор увидит виджет в своём слове дня, остальным пока всегда кнопки.
+// Сначала отправляем виджет каждому получателю. При отказе Telegram отправляем тест на кнопках.
 async function sendQuiz(env, chatId, q, text, markup) {
-  const admin = await env.DB.prepare('SELECT 1 n FROM admins WHERE user_id = ?1').bind(chatId).first('n').catch(() => null);
-  if (admin) {
-    const w = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(q), allow_queries: true, caption: text, reply_markup: markup });
-    if (w.ok || gone(w)) return w;
-    console.error('widget', w.error_code, w.description);
-  }
+  const widget = await tgApi(env, 'sendWidget', { chat_id: chatId, html: quizHtml(q), allow_queries: true, caption: text, reply_markup: markup });
+  if (widget.ok) return widget;
+  console.error('widget', widget.error_code, widget.description);
   const res = await tgApi(env, 'sendMessage', {
     chat_id: chatId, text: quizText(q) + '\n\n' + text, parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [...quizRows(q), ...markup.inline_keyboard] },
   });
   if (!res.ok) console.error('quiz', res.error_code, res.description);
-  return res;
+  return { ...res, widget_error: { code: widget.error_code, description: widget.description } };
 }
 // Ответ на тест: строка вопроса меняется на результат, кнопки вариантов убираются, остальные кнопки остаются
 async function quizCallback(env, cq) {
@@ -381,6 +377,20 @@ export default {
           if (code && env.STATS_CODE && code === env.STATS_CODE && uid) await env.DB.prepare('INSERT OR IGNORE INTO admins (user_id) VALUES (?1)').bind(uid).run();
           const isAdmin = uid && (await env.DB.prepare('SELECT 1 n FROM admins WHERE user_id = ?1').bind(uid).first('n'));
           await api('sendMessage', { chat_id: msg.chat.id, text: isAdmin ? await statsText(env) : 'Эта команда только для автора бота.' });
+          return new Response('ok');
+        }
+        if (/^\/widgettest(?:@\w+)?$/i.test(text)) {
+          const isAdmin = uid && msg.chat.type === 'private' && await env.DB.prepare('SELECT 1 n FROM admins WHERE user_id = ?1').bind(uid).first('n');
+          if (!isAdmin) {
+            await api('sendMessage', { chat_id: msg.chat.id, text: 'Эта команда только для автора бота в личном чате.' });
+            return new Response('ok');
+          }
+          const result = await sendWord(env, msg.chat.id, -180, 'Проверка виджета «Слово дня».', dailyKeys(env));
+          const detail = result.widget_error;
+          const report = detail
+            ? `Telegram отклонил виджет: ${detail.code}. ${detail.description}\n${result.ok ? 'Тест с кнопками отправлен.' : 'Не удалось отправить и тест с кнопками: ' + result.description}`
+            : 'Telegram принял виджет. Если он не отображается, проверьте его в обновлённом приложении Telegram.';
+          await api('sendMessage', { chat_id: msg.chat.id, text: report });
           return new Response('ok');
         }
         // Переписка с автором: сообщения людей приходят автору, ответ автора уходит человеку.
