@@ -146,7 +146,7 @@ async function quizCallback(env, cq) {
 const OFFER = 'Такое слово с выбором перевода бот может присылать каждый день в 9:00 по Москве. Присылать?';
 const OFFER_ALL = 'Ассаляму алейкум!\n\n' + OFFER;
 const DAILY_TEXT = 'Учить слова дальше можно в тренажёре.';
-const SEND_LIMIT = 20; // за один запуск по расписанию: у бесплатного Cloudflare ограничено число запросов
+const SEND_LIMIT = 12; // за один запуск: виджет и запасной тест — два запроса на человека, а у бесплатного Cloudflare их число ограничено
 const localMod = "(-tz) || ' minutes'";
 const offerKeys = { inline_keyboard: [[{ text: 'Присылать каждый день', callback_data: 'daily:on' }, { text: 'Не надо', callback_data: 'daily:no' }]] };
 const offKey = [{ text: 'Отключить слово дня', callback_data: 'daily:off' }];
