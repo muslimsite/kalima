@@ -129,17 +129,19 @@ async function quizCallback(env, cq) {
   const isQuiz = (r) => r.some((b) => String(b.callback_data || '').startsWith('qz:'));
   const quiz = rows.filter(isQuiz), right = quiz[a] ? quiz[a][0].text : '';
   const ok = c === a;
+  // Сначала ответ Telegram: без него кнопка крутится, пока бот пишет в базу и меняет сообщение
+  await answer(ok ? 'Верно!' : 'Неверно').catch(() => {});
   await env.DB.prepare("INSERT OR IGNORE INTO quiz_answers (user_id, message_id, day, correct) VALUES (?1, ?2, date('now'), ?3)").bind(cq.from.id, m.message_id, ok ? 1 : 0).run().catch((e) => console.error('quiz', e.message));
   await env.DB.prepare("DELETE FROM quiz_answers WHERE day < date('now', '-30 days')").run().catch(() => {});
   const text = m.text || '', i = text.indexOf(QUESTION);
   const line = ok ? `Верно, машаАллах! Это «${right}».` : `Правильный ответ: «${right}».`;
-  await tgApi(env, 'editMessageText', {
+  const ed = await tgApi(env, 'editMessageText', {
     chat_id: m.chat.id, message_id: m.message_id,
     text: i < 0 ? text + '\n\n' + line : text.slice(0, i) + line + text.slice(i + QUESTION.length),
     entities: (m.entities || []).filter((e) => i < 0 || e.offset + e.length <= i),
     reply_markup: { inline_keyboard: rows.filter((r) => !isQuiz(r)) },
-  });
-  return answer(ok ? 'Верно!' : 'Неверно');
+  }).catch((e) => ({ ok: false, description: e.message }));
+  if (!ed.ok) console.error('quiz edit', ed.error_code, ed.description);
 }
 
 /* ---------- «Слово дня» ---------- */
@@ -364,7 +366,7 @@ export default {
       if (wq) { await quizAnswer(env, wq); return new Response('ok'); }
       const cq = update && update.callback_query;
       if (cq && typeof cq.data === 'string' && cq.data.startsWith('daily:')) { await dailyCallback(env, cq); return new Response('ok'); }
-      if (cq && typeof cq.data === 'string' && cq.data.startsWith('qz:')) { await quizCallback(env, cq); return new Response('ok'); }
+      if (cq && typeof cq.data === 'string' && cq.data.startsWith('qz:')) { await quizCallback(env, cq).catch((e) => console.error('quiz', e.message)); return new Response('ok'); }
       const msg = update && update.message;
       if (msg && msg.chat) {
         const text = typeof msg.text === 'string' ? msg.text.trim() : '';
