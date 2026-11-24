@@ -340,7 +340,7 @@ export default {
         body: JSON.stringify(body),
       }).then((r) => r.json());
     const secret = await secretOf(env.BOT_TOKEN);
-    const openBtn = { inline_keyboard: [[{ text: BUTTON, web_app: { url: env.APP_URL } }], [{ text: 'Канал Медины', url: CHANNEL }]] };
+    const openBtn = { inline_keyboard: [[{ text: BUTTON, web_app: { url: env.APP_URL } }], [{ text: 'Сайт: работает без интернета', url: env.APP_URL }], [{ text: 'Канал Медины', url: CHANNEL }]] };
 
     if (url.pathname === '/me') {
       const me = await api('getMe', {});

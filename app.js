@@ -140,7 +140,7 @@ async function openTafsir(n, a) {
 const BOT = 'Koran_slovo_bot';
 const BOT_URL = 'https://t.me/' + BOT;
 const hzCache = {};
-const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=26`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
+const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=27`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
 let qrLib = null;
 function loadQr() {
   if (window.qrcode) return Promise.resolve(window.qrcode);
@@ -563,6 +563,105 @@ function checkHome() {
 }
 
 /* ---------- фон и чтец ---------- */
+/* ---------- работа без интернета ---------- */
+// Метка версии берётся из адреса этого скрипта: app.js?v=N. Ею же помечены данные.
+const VER = ((document.querySelector('script[src*="app.js?v="]') || {}).src || '').replace(/^.*[?&]v=(\d+).*$/, '$1');
+const OFFLINE = 'serviceWorker' in navigator && 'caches' in window && (location.protocol === 'https:' || location.hostname === 'localhost');
+const APP_CACHE = 'kalima-app', AUDIO_CACHE = 'kalima-audio';
+function offlineSetup() {
+  if (!OFFLINE) return;
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Через несколько секунд после запуска, чтобы не мешать: сохраняем сайт и все суры, старые версии убираем
+  setTimeout(async () => {
+    try {
+      const c = await caches.open(APP_CACHE);
+      for (const r of await c.keys()) { const m = r.url.match(/[?&]v=(\d+)/); if (m && m[1] !== VER && new URL(r.url).origin === location.origin) await c.delete(r); }
+      const core = ['./', `styles.css?v=${VER}`, `app.js?v=${VER}`, `data/words.json?v=${VER}`, `data/coverage.json?v=${VER}`, `data/hifz/index.json?v=${VER}`,
+        'favicon.svg', 'manifest.webmanifest', 'icons/icon-192.png', 'assets/manuscript-frame.webp', ...SIDX.map((x) => `data/hifz/${x.n}.json?v=${VER}`)];
+      for (const u of core) if (!(await c.match(u))) await c.add(u).catch(() => {});
+    } catch (e) {}
+  }, 4000);
+}
+const suraAudio = (n, q = S.qari) => {
+  const out = [];
+  for (let a = 1; a <= suraLen(n); a++) out.push(ayahUrl(n, a, q));
+  out.push(audhuUrl());
+  if (n !== 1 && n !== 9) out.push(ayahUrl(1, 1, q));
+  return out;
+};
+let DL = null; // идёт скачивание: { n, q, done, total, stop }
+async function dlCount(n, q) {
+  const c = await caches.open(AUDIO_CACHE), list = suraAudio(n, q);
+  let k = 0;
+  for (const u of list) if (await c.match(u)) k++;
+  return [k, list.length];
+}
+async function fillDl() {
+  const el = document.getElementById('dlBox');
+  if (!el || !OFFLINE || !HZ) return;
+  const n = HZ.n, q = S.qari, who = esc(qariName());
+  if (DL && DL.n === n && DL.q === q) { el.innerHTML = `<span>Скачивается: ${DL.done} из ${DL.total}</span><button data-act="dlstop">Остановить</button>`; return; }
+  const [k, total] = await dlCount(n, q);
+  if (!document.getElementById('dlBox') || HZ.n !== n) return;
+  el.innerHTML = k >= total
+    ? `<span>Сура скачана для офлайна, чтец ${who}</span><button data-act="dldel" data-n="${n}" data-q="${esc(q)}">Удалить</button>`
+    : `<span>${k ? `Скачано ${k} из ${total}, чтец ${who}` : `Чтобы слушать без интернета, скачайте суру. Чтец ${who}`}</span><button data-act="dl">${k ? 'Докачать' : 'Скачать'}</button>`;
+}
+async function download(n) {
+  if (DL) return;
+  const q = S.qari, list = suraAudio(n, q), c = await caches.open(AUDIO_CACHE);
+  DL = { n, q, done: 0, total: list.length, stop: false };
+  let failed = false;
+  const todo = [];
+  for (const u of list) { if (await c.match(u)) DL.done++; else todo.push(u); }
+  fillDl();
+  // по 4 файла одновременно
+  await Promise.all(Array.from({ length: 4 }, async () => {
+    while (todo.length && !DL.stop && !failed) {
+      const u = todo.shift();
+      try { await c.add(u); DL.done++; fillDl(); } catch (e) { failed = true; }
+    }
+  }));
+  const ok = !failed && !DL.stop;
+  DL = null;
+  if (ok) haptic('ok');
+  await fillDl();
+  const el = document.getElementById('dlBox');
+  if (failed && el) el.insertAdjacentHTML('beforeend', '<span class="dl-err">Не получилось скачать всё: проверьте интернет и нажмите «Докачать».</span>');
+}
+async function dlDelete(n, q) {
+  const c = await caches.open(AUDIO_CACHE);
+  for (const r of await c.keys()) { const m = r.url.match(/\/data\/([^/]+)\/(\d{3})\d{3}\.mp3$/); if (m && m[1] === q && +m[2] === n) await c.delete(r); }
+}
+// Список скачанного в настройках: сура и чтец, сколько аятов и места
+async function fillDlList() {
+  const el = document.getElementById('dlList');
+  if (!el) return;
+  const c = await caches.open(AUDIO_CACHE), groups = {};
+  for (const r of await c.keys()) {
+    const m = r.url.match(/\/data\/([^/]+)\/(\d{3})\d{3}\.mp3$/);
+    if (!m) continue;
+    const k = m[1] + '|' + +m[2], g = groups[k] || (groups[k] = { q: m[1], n: +m[2], files: 0, bytes: 0 });
+    const res = await c.match(r);
+    g.files++; g.bytes += +(res && res.headers.get('content-length')) || 0;
+  }
+  // Бисмилля перед сурой лежит как первый аят «Аль-Фатихи»: одну её отдельной строкой не показываем
+  const rows = Object.values(groups).filter((g) => !(g.n === 1 && g.files === 1)).sort((a, b) => a.n - b.n);
+  const mb = (b) => (b / 1048576).toFixed(b > 10485760 ? 0 : 1).replace('.', ',') + ' МБ';
+  const total = rows.reduce((a, g) => a + g.bytes, 0);
+  el.innerHTML = rows.length
+    ? `<div class="list">${rows.map((g) => `<div><span>${esc(suraName(g.n))}<span class="sub">${esc(qariName(g.q))}, ${mb(g.bytes)}</span></span><button class="link" data-act="dldel" data-n="${g.n}" data-q="${esc(g.q)}">Удалить</button></div>`).join('')}</div>
+       <p class="note">Всего ${mb(total)}.</p><button class="btn ghost" data-act="dlall">Удалить всё скачанное</button>`
+    : '<p class="note">Пока ничего не скачано. Скачать суру можно на её странице в хифзе.</p>';
+}
+async function dlAct(a, t) {
+  if (a === 'dl') return download(HZ.n);
+  if (a === 'dlstop') { if (DL) DL.stop = true; return; }
+  if (a === 'dldel') { await dlDelete(+t.dataset.n, t.dataset.q); fillDl(); return fillDlList(); }
+  if (a === 'dlall') return ask('Удалить все скачанные чтения?', async () => { await caches.delete(AUDIO_CACHE); fillDlList(); });
+  if (a === 'site') { const u = location.href.split('#')[0]; try { tg.openLink(u); } catch (e) { location.href = u; } }
+}
+
 function settings() {
   $where.textContent = 'Настройки';
   $view.innerHTML = `<div class="narrow stack">
@@ -573,7 +672,12 @@ function settings() {
     <p class="muted" style="margin-top:12px">Чтец для аятов и хифза. Коснитесь, чтобы выбрать и послушать.</p>
     <div class="list" role="group" aria-label="Чтец">${QARI.map(([q, name, sub]) => `<button data-act="qari" data-q="${q}" class="${S.qari === q ? 'on' : ''}" aria-pressed="${S.qari === q}"><span>${esc(name)}<span class="sub">${esc(sub)}</span></span><b>${S.qari === q ? 'выбран' : ''}</b></button>`).join('')}</div>
     <p class="note">Чтения с сайта everyayah.com.</p>
+    ${OFFLINE || tg ? `<h2 style="margin-top:12px">Без интернета</h2>
+    <p class="muted">${tg ? 'Внутри Telegram приложению нужен интернет. Откройте «Калиму» как сайт и добавьте на экран телефона: так она откроется и без сети.' : 'Сайт сохранён в телефоне и открывается без интернета. Чтения скачиваются по сурам на странице суры в хифзе.'}</p>
+    ${tg ? '<button class="btn ghost" data-act="site">Открыть как сайт</button>' : ''}
+    ${OFFLINE ? '<p class="muted">Скачанные чтения</p><div id="dlList"><p class="note">Считаю…</p></div>' : ''}` : ''}
   </div>`;
+  if (OFFLINE) fillDlList();
 }
 
 function words() {
@@ -927,7 +1031,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, key, i: 0, lo: 0, hi: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=26`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=27`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const st = startById(key), ay = HZ.data.ayahs;
     HZ.lo = st && st.from ? Math.max(0, ay.findIndex((a) => a.n === st.from)) : 0;
@@ -967,6 +1071,7 @@ function drawHifz() {
     <button class="btn" data-act="hplay">${ICON}Слушать ${S.rep > 1 ? S.rep + ' ' + plural(S.rep, 'раз', 'раза', 'раз') : ''}</button>
     <div class="seg" role="group" aria-label="Сколько раз повторять">${[1, 3, 5, 10].map((r) => `<button data-act="hrep" data-r="${r}" class="${S.rep === r ? 'on' : ''}">×${r}</button>`).join('')}</div>
     <nav class="list"><button data-act="hqari"><span>Чтец<span class="sub">${esc(qariName())}</span></span><b>сменить</b></button></nav>
+    ${OFFLINE ? '<div class="dl" id="dlBox"></div>' : ''}
     <div class="row2">
       <button class="btn ghost" data-act="hhide">${hide ? 'Показать текст' : 'Спрятать текст'}</button>
       <button class="btn ghost" data-act="hlink" ${i > lo ? '' : 'disabled'}>Связать с прошлыми</button>
@@ -979,6 +1084,7 @@ function drawHifz() {
     </div>
     ${full ? `<button class="btn ghost" data-act="hunknow">${part ? 'Снять отметку с этих аятов' : 'Снять отметку со всей суры'}</button>` : ''}
   </div>`;
+  fillDl();
 }
 function hifzAct(a, t) {
   if (a === 'hgoal') { S.goal = +t.dataset.g; save(); syncProgress(); return hifzToc(); }
@@ -1212,6 +1318,7 @@ document.addEventListener('click', (e) => {
     return;
   }
   if (a === 'daily') return toggleDaily();
+  if (a === 'dl' || a === 'dlstop' || a === 'dldel' || a === 'dlall' || a === 'site') return dlAct(a, t);
   if (a === 'kjuz' || a === 'ksura') return knownAct(a, t);
   // Действия хифза начинаются на «h»; «hello» и «homescreen» к хифзу не относятся
   if (a && a[0] === 'h' && a !== 'hello' && a !== 'homescreen') return hifzAct(a, t);
@@ -1245,9 +1352,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=26').then((r) => r.json()),
-      fetch('data/coverage.json?v=26').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=26').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=27').then((r) => r.json()),
+      fetch('data/coverage.json?v=27').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=27').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';
@@ -1261,6 +1368,7 @@ document.addEventListener('click', (e) => {
   applyTheme();
   checkHome();
   go(!S.hi ? 'welcome' : location.hash === '#hifz' ? 'hifzToc' : 'home');
+  offlineSetup();
   const remote = await loadCloud();
   if (remote && (!local || remote.t > local.t)) { apply(remote); if (screen === 'home' || (screen === 'welcome' && S.hi)) go('home'); }
   // Счётчик для автора: бот отмечает, что человек открыл приложение (только номер аккаунта и сколько выучено).
