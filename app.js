@@ -2,7 +2,9 @@
 // Прогресс хранится в Telegram CloudStorage (привязан к аккаунту), копия в localStorage.
 'use strict';
 
-const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData !== undefined ? window.Telegram.WebApp : null;
+// Скрипт Telegram есть и на сайте, но там он пустой: платформа 'unknown' и нет initData
+const TW = window.Telegram && window.Telegram.WebApp;
+const tg = TW && (TW.initData || (TW.platform && TW.platform !== 'unknown')) ? TW : null;
 const $view = document.getElementById('view');
 const $sheet = document.getElementById('sheet');
 const $where = document.getElementById('where');
@@ -140,7 +142,7 @@ async function openTafsir(n, a) {
 const BOT = 'Koran_slovo_bot';
 const BOT_URL = 'https://t.me/' + BOT;
 const hzCache = {};
-const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=27`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
+const hzSura = (n) => hzCache[n] || (hzCache[n] = fetch(`data/hifz/${n}.json?v=28`).then((r) => r.json()).catch((e) => { delete hzCache[n]; throw e; }));
 let qrLib = null;
 function loadQr() {
   if (window.qrcode) return Promise.resolve(window.qrcode);
@@ -462,7 +464,13 @@ function go(name, arg) {
   closeSheet();
   window.scrollTo(0, 0);
   ({ home, words, lesson, toc, sura, welcome, hifzToc, hifz, hifzKnown, settings, quran, read })[name](arg);
-  if (tg && tg.BackButton) name === 'home' || name === 'welcome' ? tg.BackButton.hide() : tg.BackButton.show();
+  const root = name === 'home' || name === 'welcome';
+  if (tg && tg.BackButton) root ? tg.BackButton.hide() : tg.BackButton.show();
+  if (!tg) {
+    // На сайте: своя кнопка «Назад» и системный жест «назад» (одна запись в истории на все внутренние экраны)
+    document.getElementById('backBtn').hidden = root;
+    try { if (!root && !(history.state && history.state.k)) history.pushState({ k: 1 }, ''); } catch (e) {}
+  }
 }
 function goBack() { if (!$sheet.hidden) return closeSheet(); if (back) { const b = back; back = null; return b(); } go('home'); }
 
@@ -1031,7 +1039,7 @@ async function hifz(arg) {
     const done = learnedAyahs(n);
     HZ = { n, key, i: 0, lo: 0, hi: 0, hide: false, open: new Set(), data: null };
     $view.innerHTML = '<p class="muted">Открываем суру…</p>';
-    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=27`)).json(); }
+    try { HZ.data = await (await fetch(`data/hifz/${n}.json?v=28`)).json(); }
     catch (e) { $view.innerHTML = '<p class="muted">Не получилось открыть суру. Проверьте интернет.</p>'; return; }
     const st = startById(key), ay = HZ.data.ayahs;
     HZ.lo = st && st.from ? Math.max(0, ay.findIndex((a) => a.n === st.from)) : 0;
@@ -1342,6 +1350,12 @@ document.addEventListener('click', (e) => {
   if (a === 'pin') { const id = t.dataset.id; if (!S.pin.includes(id)) S.pin.unshift(id); save(); closeSheet(); return; }
 });
 
+/* ---------- «Назад» на сайте ---------- */
+if (!tg) {
+  document.getElementById('backBtn').addEventListener('click', () => (history.state && history.state.k ? history.back() : goBack()));
+  window.addEventListener('popstate', () => { if (!(history.state && history.state.k)) goBack(); });
+}
+
 /* ---------- запуск ---------- */
 (async function start() {
   if (tg) {
@@ -1352,9 +1366,9 @@ document.addEventListener('click', (e) => {
   }
   try {
     [D, COV, SIDX] = await Promise.all([
-      fetch('data/words.json?v=27').then((r) => r.json()),
-      fetch('data/coverage.json?v=27').then((r) => r.json()).catch(() => null),
-      fetch('data/hifz/index.json?v=27').then((r) => r.json()).catch(() => []),
+      fetch('data/words.json?v=28').then((r) => r.json()),
+      fetch('data/coverage.json?v=28').then((r) => r.json()).catch(() => null),
+      fetch('data/hifz/index.json?v=28').then((r) => r.json()).catch(() => []),
     ]);
   } catch (e) {
     $view.innerHTML = '<p class="muted">Не получилось загрузить словарь. Проверьте интернет и откройте приложение ещё раз.</p>';

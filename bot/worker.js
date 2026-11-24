@@ -202,7 +202,7 @@ async function quizAnswer(env, wq) {
 }
 // Часть дневной нормы отправок: сначала слово дня подписчикам, потом разовое предложение
 async function dailyRun(env, limit) {
-  if (limit <= 0) return;
+  if (limit <= 0) return 0;
   const lm = localMod.replaceAll('tz', 'd.tz');
   const { results: due } = await env.DB.prepare(
     `SELECT d.user_id, d.tz FROM daily d LEFT JOIN reminders r ON r.user_id = d.user_id AND r.enabled = 1
@@ -216,11 +216,43 @@ async function dailyRun(env, limit) {
     else if (gone(res)) await env.DB.prepare('UPDATE daily SET enabled = 0 WHERE user_id = ?1').bind(d.user_id).run();
   }
   const left = limit - (due || []).length;
-  if (left <= 0) return;
+  if (left <= 0) return limit;
   const { results: wait } = await env.DB.prepare('SELECT user_id, tz FROM daily WHERE pending = 1 LIMIT ?1').bind(left).all();
   for (const d of wait || []) {
     await sendWord(env, d.user_id, d.tz, OFFER_ALL, offerKeys);
     await env.DB.prepare('UPDATE daily SET pending = 0 WHERE user_id = ?1').bind(d.user_id).run();
+  }
+  return limit - left + (wait || []).length;
+}
+
+/* ---------- Разовая новость всем, кто запускал бота ---------- */
+// Очередь заполняется вручную (INSERT INTO news SELECT user_id FROM users), бот рассылает по cron и удаляет из очереди.
+const NEWS_TEXT = `Ассаламу алейкум
+
+Теперь «Калиму» можно открывать без интернета: в дороге, на даче, там, где плохо ловит.
+
+<b>Как сделать</b>
+1. Откройте сайт один раз, пока есть интернет: https://muslimsite.github.io/kalima/
+2. Добавьте его на экран телефона. На iPhone в Safari нажмите «Поделиться», потом «На экран Домой». На Android в Chrome нажмите «⋮», потом «Добавить на главный экран».
+3. Чтобы слушать суры без сети, откройте нужную суру в хифзе и нажмите «Скачать» под чтецом. Скачанное можно посмотреть и удалить в «Фон и чтец», раздел «Без интернета».
+
+Сайт открывается со значка и без интернета. Слова, уроки и хифз в нём работают.
+
+Пара важных мелочей:
+- внутри Telegram без интернета приложение не откроется, поэтому без сети заходите через значок;
+- прогресс на сайте и в Telegram хранится отдельно.
+
+Ссылка на сайт есть и в боте, это кнопка «Сайт: работает без интернета».`;
+async function newsRun(env, limit) {
+  if (limit <= 0) return;
+  const { results } = await env.DB.prepare('SELECT user_id FROM news LIMIT ?1').bind(limit).all().catch(() => ({ results: [] }));
+  for (const r of results || []) {
+    const res = await tgApi(env, 'sendMessage', {
+      chat_id: r.user_id, text: NEWS_TEXT, parse_mode: 'HTML', link_preview_options: { is_disabled: true },
+      reply_markup: { inline_keyboard: [[{ text: 'Открыть сайт', url: env.APP_URL }]] },
+    }).catch((e) => ({ ok: false, description: e.message }));
+    if (!res.ok) console.error('news', r.user_id, res.error_code, res.description);
+    await env.DB.prepare('DELETE FROM news WHERE user_id = ?1').bind(r.user_id).run();
   }
 }
 
@@ -240,7 +272,8 @@ export default {
       if (res.ok) await env.DB.prepare('UPDATE reminders SET last_day = ?1 WHERE user_id = ?2').bind(day, r.user_id).run();
       else if (gone(res)) await env.DB.prepare('UPDATE reminders SET enabled = 0 WHERE user_id = ?1').bind(r.user_id).run();
     }
-    await dailyRun(env, SEND_LIMIT - sent);
+    sent += await dailyRun(env, SEND_LIMIT - sent);
+    await newsRun(env, SEND_LIMIT - sent);
   },
 
   async fetch(req, env) {

@@ -50,3 +50,6 @@ CREATE TABLE IF NOT EXISTS quiz_answers (
   correct INTEGER NOT NULL,
   PRIMARY KEY (user_id, message_id)
 );
+
+-- Разовая новость: кому ещё отправить. Заполняется вручную, бот удаляет строку после отправки.
+CREATE TABLE IF NOT EXISTS news (user_id INTEGER PRIMARY KEY);
